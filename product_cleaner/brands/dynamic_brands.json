@@ -1,0 +1,115 @@
+{
+  "PH": {
+    "aliases": [
+      "Positivehotel",
+      "Positivehotel/PH",
+      "PH",
+      "positive hotel"
+    ],
+    "type": "咖啡",
+    "country": "CN"
+  },
+  "一米八": {
+    "aliases": [
+      "一米八"
+    ],
+    "type": "生鲜",
+    "country": "CN"
+  },
+  "中街冰点": {
+    "aliases": [
+      "中街冰点",
+      "中街1946"
+    ],
+    "type": "冰淇淋",
+    "country": "CN"
+  },
+  "伊藤": {
+    "aliases": [
+      "伊藤",
+      "伊藤食品"
+    ],
+    "type": "肉制品",
+    "country": "CN"
+  },
+  "好时": {
+    "aliases": [
+      "好时",
+      "HERSHEY'S",
+      "HERSHEY'S/好时",
+      "乐天好时"
+    ],
+    "type": "巧克力",
+    "country": "US"
+  },
+  "智美": {
+    "aliases": [
+      "智美",
+      "CHIMAY",
+      "驰魅",
+      "CHIMAY/驰魅"
+    ],
+    "type": "酒类",
+    "country": "CN"
+  },
+  "朱光玉": {
+    "aliases": [
+      "朱光玉",
+      "朱光玉火锅馆",
+      "盒马X朱光玉火锅馆"
+    ],
+    "type": "火锅",
+    "country": "CN"
+  },
+  "皮爷": {
+    "aliases": [
+      "皮爷",
+      "Peet's Coffee",
+      "Peet's Coffee/皮爷",
+      "Peet's",
+      "Peet's/皮爷",
+      "Peet's Coffee 皮爷"
+    ],
+    "type": "咖啡",
+    "country": "US"
+  },
+  "盒补补": {
+    "aliases": [
+      "盒补补"
+    ],
+    "type": "茶叶",
+    "country": "CN"
+  },
+  "盒马工坊": {
+    "aliases": [
+      "盒马工坊"
+    ],
+    "type": "生鲜",
+    "country": "CN"
+  },
+  "盒马烘焙": {
+    "aliases": [
+      "盒马烘焙",
+      "北川半兵卫"
+    ],
+    "type": "烘焙",
+    "country": "CN"
+  },
+  "雷达": {
+    "aliases": [
+      "雷达",
+      "Raid",
+      "Raid/雷达",
+      "Raid雷达"
+    ],
+    "type": "日化",
+    "country": "US"
+  },
+  "清风": {
+    "aliases": [
+      "清风"
+    ],
+    "type": "未知",
+    "country": "CN"
+  }
+}

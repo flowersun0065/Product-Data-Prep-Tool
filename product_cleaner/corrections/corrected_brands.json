@@ -1,0 +1,629 @@
+{
+  "东北黑蜂": {
+    "suggested": "东北黑蜂",
+    "corrected_to": "盒马",
+    "samples": [
+      {
+        "name": "盒马 东北黑蜂椴树雪蜜 500g",
+        "category": "酒水饮料 > 麦片/冲泡 > 蜂蜜/柚子茶",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-09T21:30:42.061154"
+  },
+  "可果美": {
+    "suggested": "可果美",
+    "corrected_to": "Kagome/可果美/野菜生活",
+    "samples": [
+      {
+        "name": "Kagome野菜生活 复合纯果蔬汁200ml 日本进口",
+        "code": "138098013"
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T01:03:04.838734"
+  },
+  "久味": {
+    "suggested": "久味",
+    "corrected_to": "盒马",
+    "samples": [
+      {
+        "name": "盒马 久味话梅 130g",
+        "category": "休闲零食 > 果干蜜饯 > 梅子/西梅",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T03:24:30.147491"
+  },
+  "盒马工坊X一米八": {
+    "suggested": "盒马工坊X一米八",
+    "corrected_to": "一米八/盒马工坊X一米八",
+    "samples": [
+      {
+        "name": "【手工现作】盒马工坊X一米八 大黄鱼小馄饨-生 150g",
+        "category": "速食面点 > 春日尝鲜 > 手工现作",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T04:27:47.438169"
+  },
+  "盒马X豆西子": {
+    "suggested": "盒马X豆西子",
+    "corrected_to": "豆西子/盒马X豆西子",
+    "samples": [
+      {
+        "name": "盒马X豆西子 一口香香干 120g",
+        "category": "蔬菜豆制品 > 豆制品/魔芋 > 豆干/香干",
+        "code": ""
+      },
+      {
+        "name": "盒马X豆西子 一口香香干 120g",
+        "category": "蔬菜豆制品 > 豆制品/魔芋 > 豆干/香干",
+        "code": ""
+      }
+    ],
+    "count": 2,
+    "corrected_at": "2026-05-10T04:31:00.910672"
+  },
+  "帕斯雀": {
+    "suggested": "帕斯雀",
+    "corrected_to": "盒马",
+    "samples": [
+      {
+        "name": "盒马 帕斯雀牛肉片 150g",
+        "category": "肉禽蛋品 > 肉肠培根 > 培根/火腿片",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T04:34:29.201612"
+  },
+  "绽家": {
+    "suggested": "绽家",
+    "corrected_to": "Lycocelle/绽家",
+    "samples": [
+      {
+        "name": "Lycocelle/绽家 香氛护衣喷雾 经典白雪香 110ml",
+        "category": "厨卫百货 > 衣物洗护 > 柔顺香氛",
+        "code": ""
+      },
+      {
+        "name": "Lycocelle/绽家 香氛护衣喷雾 经典白雪香 110ml",
+        "category": "厨卫百货 > 衣物洗护 > 柔顺香氛",
+        "code": ""
+      }
+    ],
+    "count": 2,
+    "corrected_at": "2026-05-10T04:35:11.205319"
+  },
+  "娟姗": {
+    "suggested": "娟姗",
+    "corrected_to": "盒马",
+    "samples": [
+      {
+        "name": "盒马 娟姗纯牛奶 200ml*12",
+        "category": "乳品烘焙 > 常温奶/整箱 > 牛奶",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T04:38:52.678412"
+  },
+  "乐淇": {
+    "suggested": "乐淇",
+    "corrected_to": "Rockit/乐淇",
+    "samples": [
+      {
+        "name": "新西兰乐淇Rockit 苹果5#(245g)",
+        "category": "水果鲜花 > 苹果梨蕉 > 苹果",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T05:18:55.856197"
+  },
+  "Peet's": {
+    "suggested": "Peet's",
+    "corrected_to": "Peet's/皮爷",
+    "samples": [
+      {
+        "name": "Peet's 皮爷胶囊咖啡双盒(精粹浓缩+浓黑布蕾) 106g 法国进口",
+        "category": "酒水饮料 > 咖啡 > 胶囊",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T05:22:15.324782"
+  },
+  "酩品": {
+    "suggested": "酩品",
+    "corrected_to": "盒马酩品",
+    "samples": [
+      {
+        "name": "盒马酩品阿尔萨斯琼瑶浆白葡萄酒 750ml 法国进口",
+        "category": "酒水饮料 > 葡萄酒 > 白葡萄酒",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T05:25:02.684253"
+  },
+  "兔头妈妈 奥拉氟": {
+    "suggested": "兔头妈妈 奥拉氟",
+    "corrected_to": "兔头妈妈",
+    "samples": [
+      {
+        "name": "兔头妈妈 奥拉氟儿童防蛀牙膏 草莓味 50g*2",
+        "category": "美妆个护 > 口腔护理 > 儿童牙具",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T05:25:14.699895"
+  },
+  "Positivehotel": {
+    "suggested": "Positivehotel",
+    "corrected_to": "Positivehotel/PH",
+    "samples": [
+      {
+        "name": "PH每日咖啡(锡兰肉桂+阿拉比卡) 1.5g*7+1.5g*7",
+        "category": "乳品烘焙 > 咖啡豆/咖啡 > 浓缩/速溶",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T05:49:37.752925"
+  },
+  "DR.JOU 金门一条根": {
+    "suggested": "DR.JOU 金门一条根",
+    "corrected_to": "金门一条根",
+    "samples": [
+      {
+        "name": "DR.JOU 金门一条根 老姜滚珠涂抹液 40g 中国台湾地区",
+        "category": "美妆个护 > 暖体养护 > 暖体养护",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T05:52:48.985062"
+  },
+  "金华": {
+    "suggested": "金华",
+    "corrected_to": "盒马",
+    "samples": [
+      {
+        "name": "盒马 三年陈香火腿 整腿礼盒(金华) 3kg",
+        "category": "年货大街 > 腌腊干货 > 腌腊火腿",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T06:24:33.354410"
+  },
+  "意酥": {
+    "suggested": "意酥",
+    "corrected_to": "有意酥",
+    "samples": [
+      {
+        "name": "有意酥  一口脆蟹 咸蛋黄味 60g",
+        "category": "休闲零食 > 海苔/豆干 > 海苔/鱿鱼丝",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T07:14:01.730734"
+  },
+  "贝贝星": {
+    "suggested": "贝贝星",
+    "corrected_to": "BABY STAR/贝贝星",
+    "samples": [
+      {
+        "name": "BABY STAR/贝贝星 干脆宽面 香菜口味 65g 中国台湾地区",
+        "category": "休闲零食 > 进口零食 > 薯片膨化",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T07:31:01.600248"
+  },
+  "嗨棒": {
+    "suggested": "嗨棒",
+    "corrected_to": "盒马",
+    "samples": [
+      {
+        "name": "盒马 嗨棒柠檬味威士忌配制酒 330ml*3",
+        "category": "自有品牌 > 酒水饮料 > 啤酒/预调酒",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T07:32:56.459978"
+  },
+  "三芝三": {
+    "suggested": "三芝三",
+    "corrected_to": "盒补补",
+    "samples": [
+      {
+        "name": "盒补补 三芝三灵芝孢子油软胶囊 0.3g*60*2",
+        "category": "自有品牌 > 美护保健 > 美护保健",
+        "code": ""
+      },
+      {
+        "name": "盒补补 三芝三灵芝孢子油软胶囊 0.3g*60*2",
+        "category": "自有品牌 > 美护保健 > 美护保健",
+        "code": ""
+      }
+    ],
+    "count": 2,
+    "corrected_at": "2026-05-10T09:08:11.791146"
+  },
+  "好吃年年": {
+    "suggested": "好吃年年",
+    "corrected_to": "一米八",
+    "samples": [
+      {
+        "name": "一米八 好吃年年深远海大黄鱼礼盒 1.72kg(含1kg原汤)",
+        "category": "海鲜水产 > 礼盒/礼券 > 鲜品礼盒",
+        "code": ""
+      },
+      {
+        "name": "一米八 好吃年年深远海大黄鱼礼盒 1.72kg(含1kg原汤)",
+        "category": "海鲜水产 > 礼盒/礼券 > 鲜品礼盒",
+        "code": ""
+      },
+      {
+        "name": "一米八 好吃年年深远海大黄鱼礼盒 1.72kg(含1kg原汤)",
+        "category": "海鲜水产 > 礼盒/礼券 > 鲜品礼盒",
+        "code": ""
+      }
+    ],
+    "count": 3,
+    "corrected_at": "2026-05-10T09:10:34.298122"
+  },
+  "楼上": {
+    "suggested": "楼上",
+    "corrected_to": "盒补补",
+    "samples": [
+      {
+        "name": "盒补补 楼上牌破壁灵芝孢子粉 1g*120",
+        "category": "自有品牌 > 美护保健 > 参类/虫草",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T09:31:24.900978"
+  },
+  "味甘": {
+    "suggested": "味甘",
+    "corrected_to": "盒马",
+    "samples": [
+      {
+        "name": "盒马 味甘椰汁 950ml",
+        "category": "酒水饮料 > 果汁椰汁 > 椰汁",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T10:20:12.115252"
+  },
+  "鲜果鲜榨": {
+    "suggested": "鲜果鲜榨",
+    "corrected_to": "橙汁",
+    "samples": [
+      {
+        "name": "【鲜果鲜榨】橙汁 500ml",
+        "category": "水果鲜花 > 果切/小番茄 > 鲜榨果汁",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T10:28:27.537533"
+  },
+  "奥特曼 乐爱牙": {
+    "suggested": "奥特曼 乐爱牙",
+    "corrected_to": "乐爱牙",
+    "samples": [
+      {
+        "name": "奥特曼 乐爱牙 儿童牙刷",
+        "category": "美妆个护 > 口腔护理 > 儿童牙具",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T10:48:58.673878"
+  },
+  "莱福澳": {
+    "suggested": "莱福澳",
+    "corrected_to": "LoveAu/莱福澳",
+    "samples": [
+      {
+        "name": "LoveAu/莱福澳 柚子青柠味气泡水饮料 330ml 英国进口",
+        "category": "酒水饮料 > 饮用水 > 苏打/气泡水",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T10:49:26.089702"
+  },
+  "草原娟姗": {
+    "suggested": "草原娟姗",
+    "corrected_to": "盒马",
+    "samples": [
+      {
+        "name": "盒马 草原娟姗0蔗糖纯酸奶(附赠雨林蜂蜜) 450g",
+        "category": "乳品烘焙 > 酸奶/乳酸菌 > 不含蔗糖",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T10:49:58.374235"
+  },
+  "EVERSHINE": {
+    "suggested": "EVERSHINE",
+    "corrected_to": "EVERSHINE/晴天大白",
+    "samples": [
+      {
+        "name": "EVERSHINE/晴天大白 洗衣机槽清洁剂(5D凝珠除垢版) 30g*12",
+        "category": "厨卫百货 > 家居清洁 > 电器清洁",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T10:50:52.154377"
+  },
+  "天马": {
+    "suggested": "天马",
+    "corrected_to": "盒补补",
+    "samples": [
+      {
+        "name": "盒补补 天马陈皮礼盒(十五年) 100g*2",
+        "category": "年货大街 > 保健/茶叶 > 滋补品/茶叶",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T16:14:41.144283"
+  },
+  "一口香": {
+    "suggested": "一口香",
+    "corrected_to": "一口香香香香香",
+    "samples": [
+      {
+        "name": "盒马 一口香香香香香 香菜鸡汤薄片 192g",
+        "category": "休闲零食 > 饼干曲奇 > 苏打/薄脆",
+        "code": ""
+      },
+      {
+        "name": "盒马 一口香香香香香 香菜鸡汤薄片 192g",
+        "category": "休闲零食 > 饼干曲奇 > 苏打/薄脆",
+        "code": ""
+      }
+    ],
+    "count": 2,
+    "corrected_at": "2026-05-10T16:16:24.398940"
+  },
+  "Lenor": {
+    "suggested": "Lenor",
+    "corrected_to": "P&G/宝洁",
+    "samples": [
+      {
+        "name": "P&G/宝洁 Lenor留香珠白茶香水香 420ml 日本进口",
+        "category": "厨卫百货 > 衣物洗护 > 柔顺香氛",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T16:17:59.122633"
+  },
+  "林一二制果": {
+    "suggested": "林一二制果",
+    "corrected_to": "林一二",
+    "samples": [
+      {
+        "name": "林一二制果 三明治冰激凌 175g 日本进口",
+        "category": "休闲零食 > 进口零食 > 礼盒/礼包",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T16:18:50.199145"
+  },
+  "倍轻松": {
+    "suggested": "倍轻松",
+    "corrected_to": "breo/倍轻松",
+    "samples": [
+      {
+        "name": "breo/倍轻松 N6mini肩颈按摩仪一字开肩按摩器",
+        "category": "年货大街 > 保健/茶叶 > 保健器材",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T16:25:39.164989"
+  },
+  "哆比 果C": {
+    "suggested": "哆比 果C",
+    "corrected_to": "哆比",
+    "samples": [
+      {
+        "name": "哆比 果C完熟芒果果汁软糖 103g",
+        "category": "休闲零食 > 糖果/果冻 > 软糖/硬糖",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T16:28:53.335347"
+  },
+  "西贝功夫菜": {
+    "suggested": "西贝功夫菜",
+    "corrected_to": "西贝",
+    "samples": [
+      {
+        "name": "西贝功夫菜 蒙古牛大骨 1.3kg",
+        "category": "餐饮熟食 > 团圆年菜 > 硬菜",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T18:51:01.481757"
+  },
+  "宝露兹": {
+    "suggested": "宝露兹",
+    "corrected_to": "AQUAPROS/宝露兹",
+    "samples": [
+      {
+        "name": "AQUAPROS/宝露兹 天然矿泉水 420ml",
+        "category": "酒水饮料 > 饮用水 > 饮用水",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T18:52:48.421374"
+  },
+  "柏治廷 迪士尼": {
+    "suggested": "柏治廷 迪士尼",
+    "corrected_to": "柏治廷",
+    "samples": [
+      {
+        "name": "柏治廷 迪士尼 草莓熊永生花告白花束 礼盒装",
+        "category": "厨卫百货 > 家纺杂货 > 家纺杂货",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T20:37:01.211697"
+  },
+  "碧柔": {
+    "suggested": "碧柔",
+    "corrected_to": "Biore/碧柔",
+    "samples": [
+      {
+        "name": "Biore/碧柔 水膜轻透防晒液 70ml",
+        "category": "美妆个护 > 面部护肤 > 防晒",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T20:42:05.362425"
+  },
+  "阿迪达斯": {
+    "suggested": "阿迪达斯",
+    "corrected_to": "Adidas/阿迪达斯",
+    "samples": [
+      {
+        "name": "Adidas/阿迪达斯 活力净肤男士沐浴露 活力触发 400ml",
+        "category": "美妆个护 > 沐浴清洁 > 沐浴露",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T20:44:25.405311"
+  },
+  "贝亲": {
+    "suggested": "贝亲",
+    "corrected_to": "Pigeon/贝亲",
+    "samples": [
+      {
+        "name": "Pigeon/贝亲 婴儿爽身露桃叶精华 200ml",
+        "category": "美妆个护 > 身体护理 > 止汗/爽身粉",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T20:45:56.384976"
+  },
+  "缤若诗": {
+    "suggested": "缤若诗",
+    "corrected_to": "Bifesta/缤若诗",
+    "samples": [
+      {
+        "name": "Bifesta/缤若诗 卸妆湿巾 浸润型 46片 日本进口",
+        "category": "美妆个护 > 洁面/卸妆 > 卸妆",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T20:46:05.649840"
+  },
+  "盒大侠": {
+    "suggested": "盒大侠",
+    "corrected_to": "3D盒大侠",
+    "samples": [
+      {
+        "name": "盒马 3D盒大侠半半巧巧黄油巧克力口味冰淇淋 75g*3",
+        "category": "零食雪糕 > 自有品牌 > 冰淇淋/果冻",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T20:52:50.621902"
+  },
+  "吨吨哈": {
+    "suggested": "吨吨哈",
+    "corrected_to": "吨吨哈水王",
+    "samples": [
+      {
+        "name": "吨吨哈水王 喝水包5日装多口味茶 67g",
+        "category": "酒水饮料 > 水饮推荐 > 换新季",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T21:19:41.067216"
+  },
+  "八马万山红": {
+    "suggested": "八马万山红",
+    "corrected_to": "八马",
+    "samples": [
+      {
+        "name": "八马万山红 特级金骏眉(红茶) 100g",
+        "category": "酒水饮料 > 水饮推荐 > 换新季",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T21:21:12.165896"
+  },
+  "西鲜记": {
+    "suggested": "西鲜记",
+    "corrected_to": "宁夏盐池滩羊",
+    "samples": [
+      {
+        "name": "宁夏盐池滩羊 红柳羊肉串(8串) 280g",
+        "category": "肉禽蛋品 > 热卖推荐 > 烧烤季",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T21:22:55.588363"
+  },
+  "智美 驰魅": {
+    "suggested": "智美 驰魅",
+    "corrected_to": "CHIMAY/驰魅",
+    "samples": [
+      {
+        "name": "智美 驰魅(CHIMAY)蓝帽啤酒 330ml 比利时进口",
+        "category": "酒水饮料 > 啤酒预调 > 进口啤酒",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-10T22:25:04.115361"
+  },
+  "家佳康亚麻": {
+    "suggested": "家佳康亚麻",
+    "corrected_to": "家佳康",
+    "samples": [
+      {
+        "name": "【无抗安心】家佳康亚麻籽 冰鲜 猪肋排粒 400g(带软骨)",
+        "category": "肉禽蛋品 > 有机/无抗 > 无抗猪肉",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-11T16:34:51.131367"
+  }
+}

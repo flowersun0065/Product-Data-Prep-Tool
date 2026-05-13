@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# macOS
+.DS_Store
+Icon
+._*
+*.swp
+*.swo
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
+
+# Logs
+*.log
+server.log
+
+# Uploads & large data
+uploads/*.xlsx
+uploads/*.xls
+*.xlsx
+*.xls
+!product_cleaner/**/*.xlsx
+
+# Cache
+cleaner_cache.json
+
+# Generated results
+results/
+
+# Diagnosis data
+diagnosis/
+
+# History files
+history/
+# 分类结构树_改造后.txt
+
+# Virtual environment
+venv/
+.env
