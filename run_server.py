@@ -33,7 +33,7 @@ def event_check():
 
 if __name__ == '__main__':
     print("\n" + "="*70)
-    print("商品数据清理系统 V4")
+    print("商品数据清理系统 ")
     print("="*70)
     print("\n核心改进:")
     print("  ✓ 品牌聚类（去规格，包含关系不聚类）")

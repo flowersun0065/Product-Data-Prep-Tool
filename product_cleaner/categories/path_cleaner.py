@@ -67,30 +67,8 @@ MKT_PATTERNS = [
     re.compile(r'减\d+'),                  # 减10
 ]
 
-# L1合并映射表（含字符包含匹配）
-L1_MERGE_MAP = {
-    # 同义词归并
-    '蔬菜豆腐': '蔬菜豆制品',
-    '零食冰淇淋': '休闲零食',
-    '零食雪糕': '休闲零食',
-    '零食/水果': '休闲零食',
-    '速食面点': '快手菜面点',
-    '鱼虾海鲜': '海鲜水产',
-    '肉禽海鲜': '海鲜水产',
-    '海鲜/肉禽': '海鲜水产',
-    '调味品': '粮油调味',
-    '粮油干货': '粮油调味',
-    '居家用品': '家居用品',
-    '保健/茶叶': '营养保健',
-    # 污染L2归并（仅作为L2出现，不作为L1）
-    '饺子/面点': '快手菜面点',
-    '美护保健': '营养保健',
-    '牛奶咖啡': '营养早餐',
-    '宠物生活': '母婴宠物',
-    '快手菜': '肉禽蛋品',
-    '零食/冰淇淋': '乳品烘焙',
-    # 可继续补充
-}
+# L1同义词映射（由 clean_paths() 中的算法生成，运行时填充）
+L1_SYNONYM_MAP = {}
 
 
 # =========================================================================
@@ -122,20 +100,12 @@ def get_l2_depth(l2_name: str, code_paths: dict) -> dict:
 
 
 def merge_l1(l1_name: str) -> str:
-    """执行 L1 合并，返回合并后的 L1 名"""
-    return L1_MERGE_MAP.get(l1_name, l1_name)
+    """执行 L1 合并，返回合并后的 L1 名（由 clean_paths 中的算法生成 L1_SYNONYM_MAP）"""
+    return L1_SYNONYM_MAP.get(l1_name, l1_name)
 
 
-def merge_l1_match(l2_name: str) -> str | None:
-    """
-    查找合并映射表匹配（含字符包含）。
-    例如: '净膛/快手菜' 包含 '快手菜' → 映射到 '肉禽蛋品'
-    """
-    if l2_name in L1_MERGE_MAP:
-        return L1_MERGE_MAP[l2_name]
-    for src, tgt in L1_MERGE_MAP.items():
-        if l2_name in src or src in l2_name:
-            return tgt
+def merge_l1_match(l2_name: str) -> None:
+    """已废弃：L1_MERGE_MAP 已删除，所有调用点由现有兜底逻辑处理"""
     return None
 
 
@@ -270,6 +240,74 @@ def pick_final_path(paths: dict, scene_l1s: set) -> str:
 
 
 # =========================================================================
+# L1 同义词检测（替换 L1_MERGE_MAP）
+# =========================================================================
+
+def build_l1_synonym_map(code_paths: dict, all_l1: set) -> dict:
+    """
+    检测 L1 同义词，返回 {同义词L1: 标准L1} 映射。
+
+    判断条件（满足任一即视为同义词）:
+      1. L2 集包含度 >= 0.7（子集/高度重叠）
+      2. L2 集包含度 >= 0.4 + L1名共享token（同源不同名）
+
+    合并规则: 商品数少的 L1 归入商品数多的 L1
+    """
+    from collections import Counter, defaultdict
+
+    l1_l2 = defaultdict(set)
+    l1_count = Counter()
+    for _, paths in code_paths.items():
+        for path in paths:
+            parts = path.split(' > ')
+            if len(parts) == 3:
+                l1_l2[parts[0]].add(parts[1])
+                l1_count[parts[0]] += 1
+
+    l1_synonym = {}
+    all_l1_list = sorted(l1 for l1 in all_l1 if l1 in l1_l2)
+
+    for i in range(len(all_l1_list)):
+        for j in range(i + 1, len(all_l1_list)):
+            a, b = all_l1_list[i], all_l1_list[j]
+            # 仅对两个都 >30条 且 ≥3个L2 的 L1 做同义词检测
+            # 小 L1（≤30条）由 Phase 4 的 token 匹配处理
+            if l1_count[a] <= 30 or l1_count[b] <= 30:
+                continue
+            if len(l1_l2[a]) < 3 or len(l1_l2[b]) < 3:
+                continue
+            s_a, s_b = l1_l2[a], l1_l2[b]
+            inter = len(s_a & s_b)
+            union = len(s_a | s_b)
+            smaller = min(len(s_a), len(s_b))
+
+            if union == 0 or smaller == 0:
+                continue
+
+            containment = inter / smaller
+
+            # 条件 1: 高包含度
+            if containment >= 0.7:
+                pass
+            elif containment >= 0.4:
+                # 条件 2: 包含度 + L1名共享token
+                tokens_a = set(a.replace('/', ' ').split(' '))
+                tokens_b = set(b.replace('/', ' ').split(' '))
+                if not (tokens_a & tokens_b):
+                    continue
+            else:
+                continue
+
+            # 合并: 小归大
+            if l1_count[a] < l1_count[b]:
+                l1_synonym[a] = b
+            else:
+                l1_synonym[b] = a
+
+    return l1_synonym
+
+
+# =========================================================================
 # 主清洗函数
 # =========================================================================
 
@@ -299,7 +337,11 @@ def clean_paths(code_paths: dict) -> dict:
                 all_l1.add(parts[0])
     # ---- 1. 场景L1判定 ----
     scene_l1s = detect_scene_l1s(non_mkt, all_l1)
-    
+
+    # 算法生成 L1 同义词映射（替换硬编码 L1_MERGE_MAP）
+    L1_SYNONYM_MAP.clear()
+    L1_SYNONYM_MAP.update(build_l1_synonym_map(code_paths, all_l1))
+
     current = {c: dict(ps) for c, ps in non_mkt.items()}
     
     # ---- 2. 循环收敛 ----

@@ -33,7 +33,7 @@ except ImportError:
     HAS_ANTHROPIC = False
 
 try:
-    import google.generativeai as genai
+    import google.genai as genai
     HAS_GENAI = True
 except ImportError:
     HAS_GENAI = False
@@ -126,9 +126,8 @@ class ProductCleanerEngine:
 
         if p == 'gemini':
             if not HAS_GENAI:
-                raise ImportError("请安装 google-generativeai: pip install google-generativeai")
-            genai.configure(api_key=key)
-            return genai.GenerativeModel(self.model_id)
+                raise ImportError("请安装 google.genai: pip install google-genai")
+            return genai.Client(api_key=key)
 
         elif p == 'claude':
             if not HAS_ANTHROPIC:
@@ -151,7 +150,10 @@ class ProductCleanerEngine:
 
         try:
             if p == 'gemini':
-                response = self.client.generate_content(prompt)
+                response = self.client.models.generate_content(
+                    model=self.model_id,
+                    contents=prompt
+                )
                 if not response.text:
                     raise Exception("Gemini 返回了空内容")
                 return response.text

@@ -23,7 +23,7 @@ from flask import Flask, render_template_string, request, jsonify, send_file
 from flask_cors import CORS
 
 try:
-    import google.generativeai as genai
+    import google.genai as genai
     HAS_GENAI = True
 except:
     HAS_GENAI = False

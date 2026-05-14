@@ -19,7 +19,6 @@ Icon
 
 # Logs
 *.log
-server.log
 
 # Uploads & large data
 uploads/*.xlsx
@@ -30,6 +29,7 @@ uploads/*.xls
 
 # Cache
 cleaner_cache.json
+product_cleaner/cache/*.json
 
 # Generated results
 results/
@@ -39,7 +39,6 @@ diagnosis/
 
 # History files
 history/
-# 分类结构树_改造后.txt
 
 # Virtual environment
 venv/

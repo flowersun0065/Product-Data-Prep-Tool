@@ -61,6 +61,7 @@ product_cleaner/
 ## Rules
 
 - When modifying algorithm logic (brand extraction, clustering, category detection, path cleaning, AI prompts), update the corresponding documentation in `DIAGNOSIS_RULES.md` to keep references in sync.
+- When module dependencies or interface relationships change (e.g., adding/removing imports between core modules), update `core/CALL_GRAPH.md`.
 - Keep `CLAUDE.md` itself up to date when the project structure or architecture changes significantly.
 
 ## AI Integration
