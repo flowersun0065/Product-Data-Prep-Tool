@@ -236,7 +236,9 @@ HTML_TEMPLATE = '''
                     </button>
                 </div>
                 <div id="cateTreeBody" class="hidden">
-                    <input type="text" id="cateTreeSearch" placeholder="搜索分类路径..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm mb-3 focus:outline-none focus:border-cyan-500" oninput="filterCategoryTree(this.value)">
+                    <input type="text" id="cateTreeSearch" placeholder="搜索分类路径..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm mb-2 focus:outline-none focus:border-cyan-500" oninput="filterCategoryTree(this.value)">
+                    <input type="text" id="productSearch" placeholder="搜商品名/编码，快速定位清洗路径..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm mb-3 focus:outline-none focus:border-cyan-500" oninput="searchProduct(this.value)">
+                    <div id="productSearchResults" class="hidden mb-2 max-h-40 overflow-y-auto text-sm bg-slate-900/50 rounded p-1"></div>
                     <div id="cateTreeContainer" class="max-h-96 overflow-y-auto text-sm bg-slate-900/30 p-2 rounded"></div>
                 </div>
             </div>

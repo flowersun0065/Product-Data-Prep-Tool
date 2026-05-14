@@ -17,8 +17,8 @@ from ..categories.marketing_keywords import MARKETING_KEYWORDS
 from ..categories.path_cleaner import clean_paths, build_raw_paths, is_marketing
 
 # 品种分组 → L1 关键词映射
-from .lexicon import VARIETY_GROUP_L1
-from .product_parser import clean_product_name_strict, find_entity
+from .lexicon import VARIETY_GROUP_L1, CATEGORY_GROUP_CN
+from .product_parser import clean_product_name, clean_product_name_strict, find_entity, classify_word, SpecExtractor
 
 class CategoryDetector:
     """分类检测引擎"""
@@ -143,6 +143,21 @@ class CategoryDetector:
         raw_paths = build_raw_paths(df, code_col, col_mapping.get('date_code', 'date_code'),
                                      cate1_col, cate2_col, cate3_col)
         cleaned_paths = clean_paths(raw_paths)  # {path: [code1, code2, ...]}
+
+        # 额外过滤：读取 classified_paths.json 中标记为 marketing 的路径
+        # 防止 path_cleaner 模块缓存未刷新导致已标记营销的路径仍被建议
+        try:
+            from pathlib import Path
+            cp_file = Path(__file__).parent.parent / 'categories' / 'classified_paths.json'
+            if cp_file.exists():
+                import json
+                with open(cp_file, 'r', encoding='utf-8') as f:
+                    classified = json.load(f)
+                for path in list(cleaned_paths.keys()):
+                    if classified.get(path) == 'marketing':
+                        del cleaned_paths[path]
+        except Exception:
+            pass
 
         # 反转: path→codes → code→path
         code_to_path = {}
@@ -350,7 +365,8 @@ class CategoryDetector:
                 name = item.get('name', '')
                 if not name:
                     continue
-                chars = ''.join(c for c in name if '\u4e00' <= c <= '\u9fff')
+                cleaned_name = clean_product_name(name)
+                chars = ''.join(c for c in cleaned_name if '\u4e00' <= c <= '\u9fff')
                 if not chars:
                     continue
                 entity, _ = find_entity(chars, entity_dict)
@@ -367,11 +383,36 @@ class CategoryDetector:
                     brand_chars = ''.join(c for c in brand if '\u4e00' <= c <= '\u9fff')
                     if brand_chars:
                         remaining = remaining.replace(brand_chars, '', 1)
-                modifiers = [w for w in _modifier_words if remaining and w in remaining]
+                modifiers = sorted(w for w in _modifier_words if remaining and w in remaining)
+                modifier_detail = []
+                if remaining:
+                    for w in sorted(_modifier_words):
+                        if w in remaining:
+                            gk, sk = classify_word(w, NBC)
+                            _type = CATEGORY_GROUP_CN.get(gk, '')
+                            if sk and sk != gk:
+                                _type = f"{_type}-{sk}" if _type else sk
+                            modifier_detail.append({'value': w, 'type': _type if _type else gk})
+
+                entity_type = ''
+                entity_subtype = ''
+                if entity:
+                    gk, sk = classify_word(entity, NBC)
+                    entity_type = CATEGORY_GROUP_CN.get(gk, '')
+                    entity_subtype = sk if sk and sk != gk else ''
+
+                spec_weight = SpecExtractor.extract_weight_spec(name) or ''
+                spec_pack = SpecExtractor.extract_pack_spec(name) or ''
+
                 _code_to_factors[item['code']] = {
                     'entity': entity or '',
+                    'entity_type': entity_type,
+                    'entity_subtype': entity_subtype,
                     'brand_type': brand_type,
-                    'modifiers': sorted(modifiers) if modifiers else [],
+                    'modifiers': modifiers,
+                    'modifier_detail': modifier_detail,
+                    'spec_weight': spec_weight,
+                    'spec_pack': spec_pack,
                 }
             for cl in _all_items:
                 if not cl.get('factors'):
@@ -505,6 +546,34 @@ class CategoryDetector:
                     if w in remaining:
                         modifiers.add(w)
 
+        modifier_detail = []
+        if remaining:
+            for cat_key, cat_val in NBC.items():
+                words_pool = set()
+                if isinstance(cat_val, dict):
+                    for sub in cat_val.values():
+                        if isinstance(sub, (set, list)):
+                            words_pool.update(w for w in sub if isinstance(w, str) and len(w) >= 2)
+                elif isinstance(cat_val, (set, list)):
+                    words_pool.update(w for w in cat_val if isinstance(w, str) and len(w) >= 2)
+                for w in sorted(words_pool):
+                    if w in remaining and w in modifiers:
+                        gk, sk = classify_word(w, NBC)
+                        _type = CATEGORY_GROUP_CN.get(gk, '')
+                        if sk and sk != gk:
+                            _type = f"{_type}-{sk}" if _type else sk
+                        modifier_detail.append({'value': w, 'type': _type if _type else gk})
+
+        entity_type = ''
+        entity_subtype = ''
+        if entity:
+            gk, sk = classify_word(entity, NBC)
+            entity_type = CATEGORY_GROUP_CN.get(gk, '')
+            entity_subtype = sk if sk and sk != gk else ''
+
+        spec_weight = SpecExtractor.extract_weight_spec(product_name) or ''
+        spec_pack = SpecExtractor.extract_pack_spec(product_name) or ''
+
         # ── Step 4: 构建候选路径（从全量分类树） ──
         candidates = []
         for l1 in category_options.get('level1', []):
@@ -624,8 +693,13 @@ class CategoryDetector:
         if entity or brand_type or modifiers:
             factors = {
                 'entity': entity,
+                'entity_type': entity_type,
+                'entity_subtype': entity_subtype,
                 'brand_type': brand_type,
                 'modifiers': sorted(list(modifiers)) if modifiers else [],
+                'modifier_detail': modifier_detail,
+                'spec_weight': spec_weight,
+                'spec_pack': spec_pack,
                 'score': best_score,
                 'scores_detail': {
                     'entity': WEIGHT_ENTITY_L3 if entity and (entity in l3 or l3 in entity) else 0,

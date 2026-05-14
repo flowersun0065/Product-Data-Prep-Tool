@@ -1,6 +1,6 @@
 # 诊断规则参考文档
 
-> 自动生成时间: 请更新此文档时修改此时间戳
+> 最后更新: 2026-05-14（根据代码重构修正引用位置）
 >
 > 如需新增规则，修改对应源代码后同步更新本文档对应章节。
 
@@ -12,13 +12,13 @@
 
 | 类型 | 判定条件 | 源代码 |
 |------|----------|--------|
-| **缺失** (missing) | `brand` 列为空 / `None` / `NaN` | `brand_cluster.py:100` |
-| **错误** (mismatch) | `brand` 列有值，但 `check(name, brand)` 返回 `is_valid: false` | `brand_cluster.py:117-120` |
-| **正确** (valid) | `brand` 列有值，且 `check(name, brand)` 返回 `is_valid: true` | `brand_cluster.py:134` |
+| **缺失** (missing) | `brand` 列为空 / `None` / `NaN` | `brand_cluster.py` |
+| **错误** (mismatch) | `brand` 列有值，但 `check(name, brand)` 返回 `is_valid: false` | `brand_cluster.py` |
+| **正确** (valid) | `brand` 列有值，且 `check(name, brand)` 返回 `is_valid: true` | `brand_cluster.py` |
 
 ### 1.2 品牌提取算法（`_extract_from_name_v6`）
 
-源代码: `brand_checker.py:168-247`
+源代码: `brand_checker.py` `_extract_from_name_v6` 方法
 
 输入: `商品名` → 输出: `(提取的品牌名, 置信度)`
 
@@ -59,7 +59,7 @@
 
 #### 候选有效性校验（`_is_valid_brand_candidate`）
 
-源代码: `brand_checker.py:249-259`
+源代码: `brand_checker.py` `_is_valid_brand_candidate` 方法
 
 ```
 合格条件:
@@ -70,7 +70,7 @@
 
 ### 1.3 品牌一致性检测（`check`）
 
-源代码: `brand_checker.py:21-164`
+源代码: `brand_checker.py` `check` 方法
 
 输入: `(商品名, 品牌名)` → 输出: `{is_valid, issue_type, extracted_brand, confidence, message}`
 
@@ -106,9 +106,9 @@ Step 6: 无法提取
   → 无法确认 (0.50)
 ```
 
-### 1.4 品牌相似度算法（`_similarity`）
+### 1.4 品牌相似度算法（`similarity`）
 
-源代码: `brand_checker.py:268-313`
+源代码: `product_parser.py` `similarity` 方法
 
 ```
 基于编辑距离:
@@ -122,7 +122,7 @@ Step 6: 无法提取
 
 ### 1.5 品牌聚类算法（`_group_similar_brands`）
 
-源代码: `brand_cluster.py:278-332`
+源代码: `brand_cluster.py` `_group_similar_brands` 方法
 
 ```
 输入: 品牌名列表
@@ -145,7 +145,7 @@ Step 6: 无法提取
 
 ### 1.6 品牌聚类后处理（`cluster` 主流程）
 
-源代码: `brand_cluster.py:26-276`
+源代码: `brand_cluster.py` `cluster` 方法
 
 ```
 品牌正确组的处理:
@@ -170,7 +170,7 @@ Step 6: 无法提取
 
 ### 1.7 实体分离提取法（`_extract_unbranded_brand`）
 
-源代码: `brand_cluster.py:144-182`
+源代码: `brand_cluster.py` `_extract_unbranded_brand` 方法
 
 ```
 输入: 商品名（V6提取失败的商品）
@@ -187,7 +187,7 @@ Step 6: 无法提取
   → 否则 → 降级为无品牌
 ```
 
-实体词典构建 (`_build_entity_dictionary`, `brand_cluster.py:111-130`):
+实体词典构建 (`build_entity_dict`, `product_parser.py`):
 ```
 → 扫描全量商品名
 → 取每个商品名末尾2-15个中文字
@@ -198,7 +198,7 @@ Step 6: 无法提取
 
 ### 1.8 NOT_BRAND_WORDS 分类列表
 
-源代码: `brand_cluster.py:22-107`
+源代码: `lexicon.py`（NOT_BRAND_CATEGORIES 字典）
 
 共 **293 个**非品牌描述词，按来源分为 10 类：
 
@@ -227,7 +227,7 @@ Step 6: 无法提取
 
 ### 1.8 品牌后缀清理
 
-源代码: `constants.py:27`
+源代码: `constants.py` `BRAND_SUFFIXES`
 
 ```python
 BRAND_SUFFIXES = [
@@ -240,7 +240,7 @@ BRAND_SUFFIXES = [
 
 ### 1.8 规格提取（SpecExtractor）
 
-源代码: `extractors.py:12-40`
+源代码: `product_parser.py` `SpecExtractor` 类 + `constants.py` `SPEC_PATTERN`
 
 ```
 正则: (\d+\.?\d*)\s*(ml|毫升|ML|g|克|G|kg|千克|KG|l|升|L|oz|盎司|只|个|盒|袋|瓶|罐|包|条|支|桶|箱|片|块|份|杯|mm|厘米|cm|米|m)
@@ -275,7 +275,7 @@ BRAND_SUFFIXES = [
 
 ### 2.1 分类规则
 
-源代码: `category_detector.py:73-104`
+源代码: `category_detector.py` `analyze` 方法
 
 对于每条商品，每个分类路径先判定**路径类型**:
 
@@ -317,7 +317,7 @@ else:
 
 ### 2.3 聚类逻辑（`cluster_by_path`）
 
-源代码: `category_detector.py:107-122`
+源代码: `category_detector.py` `cluster_by_path`
 
 ```
 对每条商品取指定路径字段（如 suggested_path / marketing_paths / standard_paths）
@@ -330,7 +330,7 @@ else:
 
 ### 2.4 三级分类树结构
 
-源代码: `category_detector.py:124-128`
+源代码: `category_detector.py` `analyze` 方法输出
 
 ```python
 category_options = {
@@ -344,7 +344,7 @@ category_options = {
 
 ### 2.5 冲突归集规则
 
-源代码: `category_detector.py:97-99`
+源代码: `category_detector.py`（冲突分类的归集逻辑）
 
 ```
 当商品同时有 marketing_paths 和 standard_paths 时:
@@ -355,7 +355,7 @@ category_options = {
 
 ### 2.6 营销剔除规则
 
-源代码: `category_detector.py:101-102`
+源代码: `category_detector.py`（营销路径判定逻辑）
 
 ```
 当商品只有 marketing_paths 时:
@@ -398,13 +398,13 @@ category_options = {
 
 | 数据 | 存储位置 | 落盘时机 |
 |------|----------|----------|
-| 品牌规则 | `sessions[sid]['brand_rules']` (内存) + `cache_manager` | AI 处理流程 (`standardization.py`) |
-| 分类规则 | `cache_manager.get_rules(sid).categories` | AI 处理流程 (`standardization.py`) |
-| 营销标记 | `cache_manager.get_rules(sid).marketing_tags` | AI 处理流程 (`standardization.py`) |
+| 品牌规则 | `sessions[sid]['brand_rules']` (内存) + `corrected_products.json` (持久化) | 用户提交编辑时通过 `/api/brand_rules/save` 持久化 |
+| 分类规则 | `cache_manager` (rules_cache_v4.json) | AI 处理或用户操作时通过 `/api/rules/save` |
+| Session 快照 | `cache/session_snapshots.json` | 后台定时刷写（每 30 秒）+ 保存时触发 |
 
 ### 3.5 规则应用流程（AI处理阶段）
 
-源代码: `standardization.py:55-79`
+源代码: `standardization.py` `apply_rules` 方法
 
 ```
 1. 读取 rules.categories
@@ -434,7 +434,7 @@ category_options = {
 编辑 `brand_checker.py` 中 `_extract_from_name_v6` 或 `check` 方法
 
 ### 添加非品牌描述词
-编辑 `brand_cluster.py` 顶部 `NOT_BRAND_CATEGORIES` 字典中对应分类的集合（用于实体法去噪）
+编辑 `lexicon.py` 中 `NOT_BRAND_CATEGORIES` 字典下对应分类的集合（用于实体法去噪）
 
 | 分类 | 编辑位置 | 适用场景 |
 |------|----------|----------|
@@ -447,4 +447,4 @@ category_options = {
 编辑 `category_detector.py` 中 `analyze` 方法的四路归集逻辑
 
 ### 修改规格提取规则
-编辑 `core/extractors.py` 中 `SPEC_PATTERN` 正则
+编辑 `product_parser.py` 中 `SpecExtractor` 使用的正则，或 `constants.py` 中 `SPEC_PATTERN`

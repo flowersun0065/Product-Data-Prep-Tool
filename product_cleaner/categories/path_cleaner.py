@@ -203,7 +203,7 @@ def build_raw_paths(df: pd.DataFrame, code_col: str = 'org_spu_code',
         if c1 and c2 and c3:
             path = f'{c1} > {c2} > {c3}'
             existing = code_paths[code].get(path, '')
-            if date > existing:
+            if not date or date > existing:
                 code_paths[code][path] = date
     return {c: dict(ps) for c, ps in code_paths.items()}
 
@@ -263,9 +263,9 @@ def pick_final_path(paths: dict, scene_l1s: set) -> str:
     non_scene = {p: d for p, d in paths.items()
                  if p.split(' > ')[0] not in scene_l1s}
     if non_scene:
-        return max(non_scene.items(), key=lambda x: int(x[1]))[0]
+        return max(non_scene.items(), key=lambda x: int(x[1]) if x[1] else 0)[0]
     if paths:
-        return max(paths.items(), key=lambda x: int(x[1]))[0]
+        return max(paths.items(), key=lambda x: int(x[1]) if x[1] else 0)[0]
     return ''
 
 

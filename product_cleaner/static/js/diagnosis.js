@@ -146,6 +146,10 @@ async function showDiagnosis(data) {
         return;
     }
 
+    // 确保全局诊断数据可用（兼容 tryRestoreSession 等路径）
+    diagnosisData = data.diagnosis;
+    window.diagnosisData = data.diagnosis;
+
     // 隐藏进度区域，显示结果区域
     document.getElementById('progressSection').classList.add('hidden');
     document.getElementById('statsSection').classList.remove('hidden');
@@ -249,7 +253,8 @@ async function renderCategoryTree(diagnosis) {
             l3s.forEach(l3 => {
                 const path = `${l1} > ${l2} > ${l3}`;
                 const info = pathIndex[path];
-                if (!info || info.count === 0) return;
+                const count = info ? info.count : 0;
+                // 即使 count=0（全营销无清洗路径），仍展示路径供用户操作
 
                 // 分类标识（手动标记 > 算法逐级判断 > fallback）
                 const label = classified[path];
@@ -259,10 +264,10 @@ async function renderCategoryTree(diagnosis) {
                 // 隐藏营销分类模式下跳过
                 if (!window.showMarketingInTree && isMarketing) return;
 
-                const processed = info.items.filter(i => window.categoryRules[i.code]).length;
-                const remaining = info.count - processed;
-                const statusText = remaining === 0 ? '已完成' : `待处理 ${remaining}/${info.count}`;
-                const statusColor = remaining === 0 ? 'text-green-400' : 'text-yellow-400';
+                const processed = info ? info.items.filter(i => window.categoryRules[i.code]).length : 0;
+                const remaining = count - processed;
+                const statusText = count === 0 ? '无商品' : (remaining === 0 ? '已完成' : `待处理 ${remaining}/${count}`);
+                const statusColor = count === 0 ? 'text-slate-500' : (remaining === 0 ? 'text-green-400' : 'text-yellow-400');
                 const safePath = path.replace(/'/g, "\\'");
 
                 let badge = '';
@@ -283,10 +288,10 @@ async function renderCategoryTree(diagnosis) {
                 l3Html += `<div data-path="${safePath}" class="flex items-center gap-1 py-1 pl-6 hover:bg-slate-700/30 rounded group ${isActive ? 'bg-cyan-700/20 ring-1 ring-cyan-500/50' : ''}">
                     <span class="text-xs text-slate-300">${l3}</span>
                     <span class="ml-1">${badge}</span>
-                    <span class="text-[10px] text-slate-500 ml-1">${info.count}条</span>
+                    <span class="text-[10px] text-slate-500 ml-1">${count}条</span>
                     <span class="text-[9px] ${statusColor} ml-1">${statusText}</span>
                     <span class="ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                        <button onclick="openUnifiedCategoryPanel('${safePath}')" class="text-[10px] px-2 py-0.5 bg-blue-600/70 hover:bg-blue-600 rounded">查看</button>
+                        ${count > 0 ? `<button onclick="openUnifiedCategoryPanel('${safePath}')" class="text-[10px] px-2 py-0.5 bg-blue-600/70 hover:bg-blue-600 rounded">查看</button>` : ''}
                         <button onclick="classifyPath('${safePath}','marketing')" class="text-[10px] px-2 py-0.5 bg-red-600/70 hover:bg-red-600 rounded">标记营销</button>
                         <button onclick="classifyPath('${safePath}','standard')" class="text-[10px] px-2 py-0.5 bg-green-600/70 hover:bg-green-600 rounded">标记标准</button>
                     </span>
@@ -358,6 +363,46 @@ function filterCategoryTree(text) {
     });
 }
 
+// 按商品名/编码搜索清洗路径
+function searchProduct(query) {
+    const container = document.getElementById('productSearchResults');
+    if (!container) return;
+    const lower = (query || '').trim().toLowerCase();
+    if (!lower || lower.length < 2) {
+        container.classList.add('hidden');
+        return;
+    }
+    const codes = window.diagnosisData?.all_codes || [];
+    const matches = [];
+    for (const item of codes) {
+        const name = (item.name || '').toLowerCase();
+        const code = (item.code || '').toLowerCase();
+        if (name.includes(lower) || code.includes(lower)) {
+            matches.push(item);
+            if (matches.length >= 50) break;
+        }
+    }
+    if (matches.length === 0) {
+        container.innerHTML = '<div class="text-slate-500 text-xs px-2 py-1">未找到匹配商品</div>';
+        container.classList.remove('hidden');
+        return;
+    }
+    const path = matches[0].suggested_path?.[0] || '';
+    const pathDisplay = path || '<span class="text-slate-500">暂无清洗路径</span>';
+    const html = matches.map(item => {
+        const p = item.suggested_path?.[0] || '';
+        const safePath = p.replace(/'/g, "\\'");
+        return `<div class="flex items-center gap-2 px-2 py-1.5 hover:bg-cyan-700/30 rounded cursor-pointer border-b border-slate-700/50 last:border-0"
+                     onclick="openUnifiedCategoryPanel('${safePath}')">
+                    <span class="text-xs text-slate-300 truncate flex-1">${item.name}</span>
+                    <span class="text-[10px] text-slate-500 font-mono">${item.code}</span>
+                    ${p ? `<span class="text-[10px] text-cyan-400 truncate max-w-[200px]">→ ${p}</span>` : '<span class="text-[10px] text-slate-500">→ 暂无路径</span>'}
+                </div>`;
+    }).join('');
+    container.innerHTML = html;
+    container.classList.remove('hidden');
+}
+
 function toggleMarketingInTree() {
     window.showMarketingInTree = !window.showMarketingInTree;
     const btn = document.querySelector('[onclick*="toggleMarketingInTree"]');
@@ -372,6 +417,21 @@ async function classifyPath(path, label) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ path, label })
         });
+        // 标记营销后，清除该路径下所有商品的 suggested_path
+        if (label === 'marketing' && window.diagnosisData) {
+            const normalized = path.replace(/\s*>\s*/g, ' > ');
+            (window.diagnosisData.all_codes || []).forEach(item => {
+                (item.suggested_path || []).forEach((sp, idx) => {
+                    if (sp.replace(/\s*>\s*/g, ' > ') === normalized) {
+                        item.suggested_path.splice(idx, 1);
+                    }
+                });
+                if (!item.suggested_path || item.suggested_path.length === 0) {
+                    item.suggested_path = [];
+                    item._section = 'missing';
+                }
+            });
+        }
         await renderCategoryTree(window.diagnosisData);
     } catch (e) {
         console.error('分类标记失败:', e);
@@ -411,6 +471,20 @@ async function batchClassifyPath(l1, l2, label) {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ paths, label })
         });
+        // 批量标记营销后，清除这些路径下所有商品的 suggested_path
+        if (label === 'marketing' && window.diagnosisData) {
+            const normalizedPaths = new Set(paths.map(p => p.replace(/\s*>\s*/g, ' > ')));
+            (window.diagnosisData.all_codes || []).forEach(item => {
+                if (!item.suggested_path) return;
+                item.suggested_path = item.suggested_path.filter(sp => {
+                    const nsp = sp.replace(/\s*>\s*/g, ' > ');
+                    return !normalizedPaths.has(nsp);
+                });
+                if (item.suggested_path.length === 0) {
+                    item._section = 'missing';
+                }
+            });
+        }
         await renderCategoryTree(window.diagnosisData);
     } catch (e) {
         console.error('批量分类标记失败:', e);
@@ -451,13 +525,27 @@ function renderMissingItems(items) {
                 `<div class="text-[10px] text-slate-500 mt-0.5 italic">暂无适合分类建议，请手动选择</div>`);
         const factors = item.factors || {};
         let factorsHtml = '';
-        if (factors.entity || factors.brand_type) {
+        if (factors.entity || factors.brand_type || (factors.modifier_detail && factors.modifier_detail.length) || factors.spec_weight || factors.spec_pack) {
             const parts = [];
-            if (factors.entity) parts.push(`entity="${factors.entity}" ${factors.scores_detail?.entity ? '+' + factors.scores_detail.entity : ''}`);
-            if (factors.brand_type) parts.push(`type="${factors.brand_type}" ${factors.scores_detail?.brand_type ? '+' + factors.scores_detail.brand_type : ''}`);
-            if (factors.modifiers?.length) parts.push(`修饰词=${factors.modifiers.join(',')} ${factors.scores_detail?.modifiers ? '+' + factors.scores_detail.modifiers : ''}`);
+            let entityLabel = `entity="${factors.entity}"`;
+            if (factors.entity_type) {
+                entityLabel += ` [${factors.entity_type}`;
+                if (factors.entity_subtype) entityLabel += `-${factors.entity_subtype}`;
+                entityLabel += ']';
+            }
+            if (factors.brand_type) parts.push(`type="${factors.brand_type}"`);
+            if (factors.modifier_detail && factors.modifier_detail.length) {
+                const modStr = factors.modifier_detail.map(m => `${m.value}[${m.type}]`).join(',');
+                parts.push(`修饰词=${modStr}`);
+            } else if (factors.modifiers?.length) {
+                parts.push(`修饰词=${factors.modifiers.join(',')}`);
+            }
+            const specParts = [];
+            if (factors.spec_weight) specParts.push(factors.spec_weight);
+            if (factors.spec_pack) specParts.push(factors.spec_pack);
+            if (specParts.length) parts.push(`规格: ${specParts.join(' | ')}`);
             if (item.corrected_from_history) parts.push('📌 历史修正');
-            if (parts.length) factorsHtml = `<div class="text-[9px] text-cyan-300 mt-0.5">🔍 ${parts.join(' | ')}</div>`;
+            if (parts.length) factorsHtml = `<div class="text-[9px] text-cyan-300 mt-0.5">🔍 ${entityLabel}${parts.length ? ' | ' + parts.join(' | ') : ''}</div>`;
         }
         return `<div class="flex items-start justify-between py-2 px-3 ${isConfirmed ? 'bg-green-900/20 border border-green-700/30' : 'bg-slate-700/30'} rounded mb-1">
             <div class="text-sm mr-2 flex-1 min-w-0 flex items-start gap-2">
@@ -756,13 +844,27 @@ function renderCategoryPanelContent() {
 
         const factors = item.factors || {};
         let factorsHtml = '';
-        if (factors.entity || factors.brand_type) {
+        if (factors.entity || factors.brand_type || (factors.modifier_detail && factors.modifier_detail.length) || factors.spec_weight || factors.spec_pack) {
             const parts = [];
-            if (factors.entity) parts.push(`entity="${factors.entity}" ${factors.scores_detail?.entity ? '+' + factors.scores_detail.entity : ''}`);
-            if (factors.brand_type) parts.push(`type="${factors.brand_type}" ${factors.scores_detail?.brand_type ? '+' + factors.scores_detail.brand_type : ''}`);
-            if (factors.modifiers?.length) parts.push(`修饰词=${factors.modifiers.join(',')} ${factors.scores_detail?.modifiers ? '+' + factors.scores_detail.modifiers : ''}`);
+            let entityLabel = `entity="${factors.entity}"`;
+            if (factors.entity_type) {
+                entityLabel += ` [${factors.entity_type}`;
+                if (factors.entity_subtype) entityLabel += `-${factors.entity_subtype}`;
+                entityLabel += ']';
+            }
+            if (factors.brand_type) parts.push(`type="${factors.brand_type}"`);
+            if (factors.modifier_detail && factors.modifier_detail.length) {
+                const modStr = factors.modifier_detail.map(m => `${m.value}[${m.type}]`).join(',');
+                parts.push(`修饰词=${modStr}`);
+            } else if (factors.modifiers?.length) {
+                parts.push(`修饰词=${factors.modifiers.join(',')}`);
+            }
+            const specParts = [];
+            if (factors.spec_weight) specParts.push(factors.spec_weight);
+            if (factors.spec_pack) specParts.push(factors.spec_pack);
+            if (specParts.length) parts.push(`规格: ${specParts.join(' | ')}`);
             if (item.corrected_from_history) parts.push('📌 历史修正');
-            if (parts.length) factorsHtml = `<div class="text-[9px] text-cyan-300 mt-0.5">🔍 ${parts.join(' | ')}</div>`;
+            if (parts.length) factorsHtml = `<div class="text-[9px] text-cyan-300 mt-0.5">🔍 ${entityLabel}${parts.length ? ' | ' + parts.join(' | ') : ''}</div>`;
         }
 
         const allOpts = (item.all_paths || []).concat(suggestedPath ? [suggestedPath] : []);

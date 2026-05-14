@@ -377,7 +377,7 @@ def diagnose_async(session_id: str, file_path: str, col_mapping: Dict):
                             if b_name in load_dismissed_brands():
                                 continue
                             metadata = infer_brand_metadata(item['name'], item.get('category_path', ''))
-                            
+
                             auto_new_brands.append({
                                 'name': b_name,
                                 'aliases': [b_name],
@@ -390,7 +390,38 @@ def diagnose_async(session_id: str, file_path: str, col_mapping: Dict):
                                 'is_slash_brand': '/' in (metadata['suggested_name'] or b_name)
                             })
                             seen_new_brands.add(b_name)
-        
+
+        # 品牌列为空时，从 missing 聚类中提取新品牌候选
+        for cluster in brand_clusters:
+            if cluster.get('type') != 'missing':
+                continue
+            b_name = cluster.get('suggested_standard')
+            if not b_name or b_name in seen_new_brands:
+                continue
+            if b_name in corrected_brands:
+                entry = corrected_brands[b_name]
+                corrected_to = entry['corrected_to']
+                if find_any_brand(corrected_to)['found']:
+                    continue
+                b_name = corrected_to
+            if not find_any_brand(b_name)['found']:
+                if b_name in load_dismissed_brands():
+                    continue
+                sample = (cluster.get('items') or [{}])[0]
+                metadata = infer_brand_metadata(sample.get('name', ''), sample.get('category_path', ''))
+                auto_new_brands.append({
+                    'name': b_name,
+                    'aliases': [b_name],
+                    'type': metadata['type'],
+                    'country': metadata['country'],
+                    'suggested_name': metadata['suggested_name'],
+                    'sample_product': sample.get('name', ''),
+                    'sample_category': sample.get('category_path', ''),
+                    'confirmed': False,
+                    'is_slash_brand': '/' in (metadata['suggested_name'] or b_name)
+                })
+                seen_new_brands.add(b_name)
+
         session['new_brands'] = auto_new_brands
 
         session['diagnosis_progress'] = 80
@@ -962,6 +993,37 @@ def register_routes(app):
                                 'is_slash_brand': '/' in (metadata['suggested_name'] or b_name)
                             })
                             seen_new_brands.add(b_name)
+
+        # 品牌列为空时，从 missing 聚类中提取新品牌候选
+        for cluster in brand_clusters:
+            if cluster.get('type') != 'missing':
+                continue
+            b_name = cluster.get('suggested_standard')
+            if not b_name or b_name in seen_new_brands:
+                continue
+            if b_name in corrected_brands:
+                entry = corrected_brands[b_name]
+                corrected_to = entry['corrected_to']
+                if find_any_brand(corrected_to)['found']:
+                    continue
+                b_name = corrected_to
+            if not find_any_brand(b_name)['found']:
+                if b_name in load_dismissed_brands():
+                    continue
+                sample = (cluster.get('items') or [{}])[0]
+                metadata = infer_brand_metadata(sample.get('name', ''), sample.get('category_path', ''))
+                auto_new_brands.append({
+                    'name': b_name,
+                    'aliases': [b_name],
+                    'type': metadata['type'],
+                    'country': metadata['country'],
+                    'suggested_name': metadata['suggested_name'],
+                    'sample_product': sample.get('name', ''),
+                    'sample_category': sample.get('category_path', ''),
+                    'confirmed': False,
+                    'is_slash_brand': '/' in (metadata['suggested_name'] or b_name)
+                })
+                seen_new_brands.add(b_name)
 
         # 应用分类修正记录
         if corrected_cats and entity_dict:

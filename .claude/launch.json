@@ -5,7 +5,8 @@
       "name": "Flask Web App",
       "runtimeExecutable": "python",
       "runtimeArgs": ["run_server.py"],
-      "port": 5001
+      "port": 5001,
+      "autoPort": true
     }
   ]
 }

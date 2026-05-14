@@ -47,4 +47,5 @@ if __name__ == '__main__':
     print("复核: http://localhost:5001/review")
     print("="*70 + "\n")
 
-    app.run(host='127.0.0.1', port=5001, debug=True, threaded=True, use_reloader=False)
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='127.0.0.1', port=port, debug=True, threaded=True, use_reloader=False)

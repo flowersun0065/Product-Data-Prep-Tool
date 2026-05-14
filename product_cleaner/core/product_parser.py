@@ -17,13 +17,16 @@ import re
 from typing import Dict, List, Tuple, Optional
 from collections import defaultdict
 
-from .lexicon import SPEC_UNITS_PATTERN, NOT_BRAND_WORDS, SIZE_PREFIXES
+from .lexicon import (SPEC_UNITS_PATTERN, NOT_BRAND_WORDS, SIZE_PREFIXES,
+    WEIGHT_UNITS_PATTERN, PACK_UNITS_PATTERN, CATEGORY_GROUP_CN)
 
 # ====================================================================
 # 常量
 # ====================================================================
 
 SPEC_PATTERN = r'(\d+\.?\d*)\s*(' + SPEC_UNITS_PATTERN + r')'
+WEIGHT_SPEC_PATTERN = r'(\d+\.?\d*)\s*(' + WEIGHT_UNITS_PATTERN + r')'
+PACK_SPEC_PATTERN = r'(\d+\.?\d*)\s*(' + PACK_UNITS_PATTERN + r')'
 
 
 # ====================================================================
@@ -101,6 +104,26 @@ class SpecExtractor:
         if not text:
             return False
         return bool(re.search(SPEC_PATTERN, text, re.IGNORECASE))
+
+    @staticmethod
+    def extract_weight_spec(text: str) -> Optional[str]:
+        """提取克重/计量规格（如 260g, 500ml, 5kg），取最后一个匹配"""
+        if not text:
+            return None
+        match = None
+        for m in re.finditer(WEIGHT_SPEC_PATTERN, text, re.IGNORECASE):
+            match = m
+        return match.group(0) if match else None
+
+    @staticmethod
+    def extract_pack_spec(text: str) -> Optional[str]:
+        """提取计价/包装规格（如 2个, 4粒, 1盒），取最后一个匹配"""
+        if not text:
+            return None
+        match = None
+        for m in re.finditer(PACK_SPEC_PATTERN, text, re.IGNORECASE):
+            match = m
+        return match.group(0) if match else None
 
 
 # ====================================================================
@@ -311,3 +334,33 @@ def similarity(s1: str, s2: str) -> float:
 
     max_len = max(m, n)
     return 1.0 - dp[m][n] / max_len
+
+
+def classify_word(word: str, categories: dict) -> Tuple[str, str]:
+    """
+    在 NOT_BRAND_CATEGORIES 中查找 word 所属的分组。
+
+    Args:
+        word: 要查找的词
+        categories: NOT_BRAND_CATEGORIES 字典
+
+    Returns:
+        Tuple[str, str]: (group_key, sub_group_key)
+            未找到时返回 ('', '')
+    """
+    if not word or len(word) < 2:
+        return '', ''
+    for cat_key, cat_val in categories.items():
+        if isinstance(cat_val, dict):
+            for sub_key, sub_val in cat_val.items():
+                if isinstance(sub_val, (set, list)):
+                    if word in sub_val:
+                        return cat_key, sub_key
+                elif isinstance(sub_val, dict):
+                    for sub2_val in sub_val.values():
+                        if isinstance(sub2_val, (set, list)) and word in sub2_val:
+                            return cat_key, sub_key
+        elif isinstance(cat_val, (set, list)):
+            if word in cat_val:
+                return cat_key, ''
+    return '', ''
