@@ -643,3 +643,181 @@ REVIEW_TEMPLATE = '''
 </body>
 </html>
 '''
+
+
+# ── Electron Layout Templates ──
+
+SIDEBAR_TEMPLATE = """
+<div class="sidebar">
+  <div class="sidebar-header">
+    <select id="sidebarGroupSelect" onchange="switchGroup(this.value)">
+      <option value="">-- 选择分组 --</option>
+    </select>
+  </div>
+  <div class="sidebar-nav">
+    <div class="sidebar-section">当前会话</div>
+    <div id="sidebarSessionSteps"></div>
+
+    <div class="sidebar-section">品牌库</div>
+    <div class="sidebar-item" data-page="brand-database" onclick="navigateTo('brand-database')">
+      📋 品牌数据库
+    </div>
+    <div class="sidebar-item" data-page="brand-corrections" onclick="navigateTo('brand-corrections')">
+      ✏️ 品牌修正记录
+    </div>
+    <div class="sidebar-item" data-page="brand-relationships" onclick="navigateTo('brand-relationships')">
+      🔗 品牌关系
+    </div>
+
+    <div class="sidebar-section">分类体系</div>
+    <div class="sidebar-item" data-page="category-tree" onclick="navigateTo('category-tree')">
+      🌳 分类路径树
+    </div>
+    <div class="sidebar-item" data-page="category-classify" onclick="navigateTo('category-classify')">
+      🏷 路径分类标记
+    </div>
+    <div class="sidebar-item" data-page="category-corrections" onclick="navigateTo('category-corrections')">
+      📝 分类修正记录
+    </div>
+
+    <div class="sidebar-section">历史会话</div>
+    <div id="sidebarHistory"></div>
+  </div>
+  <div class="sidebar-footer" onclick="openSettings()">
+    ⚙ 设置
+  </div>
+</div>
+"""
+
+TAB_BAR_TEMPLATE = """
+<div class="tab-bar">
+  <div class="tab-item active" data-tab="upload" onclick="switchTab('upload')">
+    1 上传 & 诊断
+  </div>
+  <div class="tab-item" data-tab="brand-review" onclick="switchTab('brand-review')">
+    2 品牌审核
+  </div>
+  <div class="tab-item" data-tab="ai-process" onclick="switchTab('ai-process')">
+    3 AI 处理
+  </div>
+  <div class="tab-item" data-tab="review" onclick="switchTab('review')">
+    4 复核
+  </div>
+  <div class="tab-item" data-tab="export" onclick="switchTab('export')">
+    5 导出
+  </div>
+</div>
+"""
+
+ELECTRON_LAYOUT = """
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>产品数据清洗工具</title>
+  <link rel="stylesheet" href="/static/css/native.css">
+</head>
+<body>
+  <!-- Title bar (draggable) -->
+  <div class="title-bar">产品数据清洗工具</div>
+
+  <div class="app-layout">
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="tabBarContainer"></div>
+      <div class="tab-content" id="tabContent">
+        <!-- Upload & Diagnosis -->
+        <div id="panel-upload" class="tab-panel">
+          <div id="uploadSection"></div>
+          <div id="diagnosisSection" class="hidden"></div>
+          <div id="progressSection" class="hidden"></div>
+        </div>
+        <!-- Brand Review -->
+        <div id="panel-brand-review" class="tab-panel hidden">
+          <div id="brandReviewContainer" style="padding:16px;"></div>
+        </div>
+        <!-- AI Process -->
+        <div id="panel-ai-process" class="tab-panel hidden">
+          <div id="aiProcessContainer" style="padding:16px;"></div>
+        </div>
+        <!-- Review -->
+        <div id="panel-review" class="tab-panel hidden">
+          <div id="reviewContainer" style="padding:16px;"></div>
+        </div>
+        <!-- Export -->
+        <div id="panel-export" class="tab-panel hidden">
+          <div id="exportContainer" style="padding:16px;"></div>
+        </div>
+
+        <!-- Sidebar pages (not in tab flow) -->
+        <div id="panel-brand-database" class="page-content hidden">
+          <div style="padding:16px;">
+            <h2 style="margin-bottom:12px;font-size:14px;font-weight:600;">品牌数据库</h2>
+            <div id="brandDatabaseContent"></div>
+          </div>
+        </div>
+        <div id="panel-brand-corrections" class="page-content hidden">
+          <div style="padding:16px;">
+            <h2 style="margin-bottom:12px;font-size:14px;font-weight:600;">品牌修正记录</h2>
+            <div id="brandCorrectionsContent"></div>
+          </div>
+        </div>
+        <div id="panel-brand-relationships" class="page-content hidden">
+          <div style="padding:16px;">
+            <h2 style="margin-bottom:12px;font-size:14px;font-weight:600;">品牌关系</h2>
+            <div id="brandRelationshipsContent"></div>
+          </div>
+        </div>
+        <div id="panel-category-tree" class="page-content hidden">
+          <div style="padding:16px;display:flex;gap:12px;">
+            <div style="width:320px;" id="categoryTreeContainer"></div>
+            <div style="flex:1;" id="categoryTreeRight"></div>
+          </div>
+        </div>
+        <div id="panel-category-classify" class="page-content hidden">
+          <div style="padding:16px;">
+            <h2 style="margin-bottom:12px;font-size:14px;font-weight:600;">路径分类标记</h2>
+            <div id="categoryClassifyContent"></div>
+          </div>
+        </div>
+        <div id="panel-category-corrections" class="page-content hidden">
+          <div style="padding:16px;">
+            <h2 style="margin-bottom:12px;font-size:14px;font-weight:600;">分类修正记录</h2>
+            <div id="categoryCorrectionsContent"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared detail panel -->
+  <div id="detailOverlay" class="detail-overlay" onclick="closeDetail()"></div>
+  <div id="detailPanel" class="detail-panel">
+    <div id="detailContent"></div>
+  </div>
+
+  <script src="/static/js/common.js"></script>
+  <script src="/static/js/sidebar.js"></script>
+  <script src="/static/js/detail-panel.js"></script>
+  <script src="/static/js/upload.js"></script>
+  <script src="/static/js/diagnosis.js"></script>
+  <script src="/static/js/brand_editor.js"></script>
+  <script src="/static/js/ai_process.js"></script>
+  <script src="/static/js/review.js"></script>
+  <script src="/static/js/export.js"></script>
+  <script src="/static/js/brand-library.js"></script>
+  <script src="/static/js/category-tree.js"></script>
+  <script>
+    // Initialize Electron layout
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('sidebarContainer').innerHTML = SIDEBAR_TEMPLATE;
+      document.getElementById('tabBarContainer').innerHTML = TAB_BAR_TEMPLATE;
+      if (typeof initSidebar === 'function') initSidebar();
+      if (typeof initTabBar === 'function') initTabBar();
+      if (typeof loadGroups === 'function') loadGroups();
+    });
+  </script>
+</body>
+</html>
+"""
