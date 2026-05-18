@@ -452,3 +452,18 @@ function categoryStatusLabel(status) {
 
 // 入口
 document.addEventListener('DOMContentLoaded', init);
+
+// Override local selectItem to use shared detail panel
+if (typeof openDetail !== 'undefined') {
+    var _selectItem = selectItem;
+    selectItem = function(code) {
+        var item = R.filtered.find(function(d) { return d.code === code; });
+        if (item) {
+            R.selectedCode = code;
+            renderList();
+            openDetail(item);
+            var placeholder = document.getElementById('detailPlaceholder');
+            if (placeholder) placeholder.classList.remove('hidden');
+        }
+    };
+}

@@ -1399,3 +1399,44 @@ window.batchMarkAllAsMarketing = batchMarkAllAsMarketing;
 window.toggleMarketingInTree = toggleMarketingInTree;
 window.batchClassifyPath = batchClassifyPath;
 window.reclassifyExcludeMarketing = reclassifyExcludeMarketing;
+
+// Wire up detail panel on cluster item clicks
+function initDiagnosisDetailPanel() {
+    // Delegate click events on cluster items and missing items
+    document.addEventListener('click', function(e) {
+        var target = e.target.closest('[data-code]');
+        if (!target) return;
+        var code = target.dataset.code;
+        if (!code) return;
+        var item = findItemByCode(code);
+        if (item) {
+            e.preventDefault();
+            openDetail(item);
+        }
+    });
+}
+
+function findItemByCode(code) {
+    // Search in all_codes, missing_items, and cluster items
+    var diag = window.diagnosisData;
+    if (!diag) return null;
+
+    // Check all_codes
+    var allCodes = diag.all_codes || [];
+    for (var i = 0; i < allCodes.length; i++) {
+        if (String(allCodes[i].code) === String(code)) return allCodes[i];
+    }
+
+    // Check missing_items
+    var missing = diag.missing_items || [];
+    for (var i = 0; i < missing.length; i++) {
+        if (String(missing[i].code) === String(code)) return missing[i];
+    }
+
+    return null;
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(initDiagnosisDetailPanel, 500);
+});

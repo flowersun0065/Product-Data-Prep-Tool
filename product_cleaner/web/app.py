@@ -1097,6 +1097,12 @@ def register_routes(app):
         from ..templates.html_templates import HTML_TEMPLATE
         return render_template_string(HTML_TEMPLATE)
 
+    @app.route('/electron')
+    def electron_app():
+        """Serve the Electron-specific layout."""
+        from ..templates.html_templates import ELECTRON_LAYOUT
+        return render_template_string(ELECTRON_LAYOUT)
+
     @app.route('/review')
     def review_page():
         from ..templates.html_templates import REVIEW_TEMPLATE
