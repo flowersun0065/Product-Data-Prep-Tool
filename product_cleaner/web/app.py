@@ -11,6 +11,7 @@ import json
 import time
 import hashlib
 import logging
+import shutil
 import threading
 import uuid
 from datetime import datetime, timedelta
@@ -1147,6 +1148,328 @@ def register_routes(app):
             'data_dir': str(_electron_data_dir) if _electron_data_dir else '',
         })
 
+def _process_sync_upload(df, temp_filepath, original_filename, group_id):
+    """同步处理小文件"""
+    cols = df.columns.tolist()
+    col_mapping = {}
+
+    for col in cols:
+        col_lower = col.lower()
+        if 'spu_name' in col_lower or '商品名' in col_lower:
+            col_mapping['org_spu_name'] = col
+        elif 'brand' in col_lower or '品牌' in col_lower:
+            col_mapping['brand_name'] = col
+        elif 'spec' in col_lower or '规格' in col_lower:
+            col_mapping['spu_spec'] = col
+        elif 'cate_level1' in col_lower or '一级分类' in col_lower:
+            col_mapping['cate_level1_name'] = col
+        elif 'cate_level2' in col_lower or '二级分类' in col_lower:
+            col_mapping['cate_level2_name'] = col
+        elif 'cate_level3' in col_lower or '三级分类' in col_lower:
+            col_mapping['cate_level3_name'] = col
+        elif 'org_image_url' in col_lower or '商品图' in col_lower or '图片' in col_lower:
+            col_mapping['org_image_url'] = col
+
+    if 'org_spu_name' not in col_mapping:
+        try:
+            temp_filepath.unlink()
+        except:
+            pass
+        return jsonify({'error': '缺少商品名称列'}), 400
+
+    session_id = f"session_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+
+    # 将临时文件重命名为正式文件名
+    filename = f"{session_id}_{original_filename}"
+    filepath = UPLOAD_FOLDER / filename
+    temp_filepath.rename(filepath)
+
+    # 自动识别商品code列
+    code_col = None
+    for col in cols:
+        col_lower = col.lower()
+        if 'spu_code' in col_lower or 'code' in col_lower or '商品code' in col_lower or '编码' in col_lower:
+            code_col = col
+            col_mapping['org_spu_code'] = col
+            break
+
+    brand_clusters = BrandClusterEngine.cluster(df, col_mapping['org_spu_name'], col_mapping.get('brand_name'), code_col, col_mapping)
+    name_col = col_mapping.get('org_spu_name')
+    entity_dict = build_entity_dict(df[name_col].dropna().astype(str).tolist()) if name_col else {}
+    category_result = CategoryDetector.analyze(df, col_mapping, entity_dict)
+
+    # 加载持久化的确认和修正规则
+    from ..brands.database import load_corrected_products, load_corrected_brands, load_corrected_categories, find_any_brand, load_dismissed_brands
+    confirmed_rules = load_corrected_products(group_id)
+    corrected_brands = load_corrected_brands()
+    corrected_cats = load_corrected_categories()
+
+    # 将已修正的分类注入分类规则缓存
+    cat_rules_changed = False
+    cache_rules = cache_manager.get_rules(group_id, session_id) or {}
+    cat_rules = cache_rules.get('categories', {})
+    for code, info in confirmed_rules.items():
+        if info.get('category') and code not in cat_rules:
+            cat_rules[code] = {'action': 'confirm', 'replacement': info['category']}
+            cat_rules_changed = True
+    if cat_rules_changed:
+        cache_manager.set_rules(group_id, session_id, {**cache_rules, 'categories': cat_rules})
+
+    # === 自动提取新品牌候选者 (带智能推断) ===
+    auto_new_brands = []
+    seen_new_brands = set()
+    for cluster in brand_clusters:
+        for item in cluster.get('items', []):
+            if item.get('issue_type') == 'new_brand_candidate':
+                item_code = str(item.get('code', '')).strip()
+                if item_code in confirmed_rules:
+                    continue
+                b_name = item['brand']
+                if b_name and b_name not in seen_new_brands:
+                    if b_name in corrected_brands:
+                        entry = corrected_brands[b_name]
+                        corrected_to = entry['corrected_to']
+                        if find_any_brand(corrected_to)['found']:
+                            item['corrected_from_history'] = True
+                            item['corrected_brand'] = corrected_to
+                            continue
+                        else:
+                            b_name = corrected_to
+                            item['corrected_from_history'] = True
+                            item['corrected_brand'] = corrected_to
+                    if not find_any_brand(b_name)['found']:
+                        if b_name in load_dismissed_brands():
+                            continue
+                        metadata = infer_brand_metadata(item['name'], item.get('category_path', ''))
+
+                        auto_new_brands.append({
+                            'name': b_name,
+                            'aliases': [b_name],
+                            'type': metadata['type'],
+                            'country': metadata['country'],
+                            'suggested_name': metadata['suggested_name'],
+                            'sample_product': item['name'],
+                            'sample_category': item.get('category_path', ''),
+                            'confirmed': False,
+                            'is_slash_brand': '/' in (metadata['suggested_name'] or b_name)
+                        })
+                        seen_new_brands.add(b_name)
+
+    # 品牌列为空时，从 missing 聚类中提取新品牌候选
+    for cluster in brand_clusters:
+        if cluster.get('type') != 'missing':
+            continue
+        b_name = cluster.get('suggested_standard')
+        if not b_name or b_name in seen_new_brands:
+            continue
+        if b_name in corrected_brands:
+            entry = corrected_brands[b_name]
+            corrected_to = entry['corrected_to']
+            if find_any_brand(corrected_to)['found']:
+                continue
+            b_name = corrected_to
+        if not find_any_brand(b_name)['found']:
+            if b_name in load_dismissed_brands():
+                continue
+            sample = (cluster.get('items') or [{}])[0]
+            metadata = infer_brand_metadata(sample.get('name', ''), sample.get('category_path', ''))
+            auto_new_brands.append({
+                'name': b_name,
+                'aliases': [b_name],
+                'type': metadata['type'],
+                'country': metadata['country'],
+                'suggested_name': metadata['suggested_name'],
+                'sample_product': sample.get('name', ''),
+                'sample_category': sample.get('category_path', ''),
+                'confirmed': False,
+                'is_slash_brand': '/' in (metadata['suggested_name'] or b_name)
+            })
+            seen_new_brands.add(b_name)
+
+    # 应用分类修正记录
+    if corrected_cats and entity_dict:
+        for group_key in ['missing_items', 'conflict_groups', 'marketing_groups', 'standard_groups']:
+            for group in category_result.get(group_key, []):
+                for gitem in group.get('items', []):
+                    factors = gitem.get('factors', {}) or {}
+                    entity = factors.get('entity')
+                    if entity and entity in corrected_cats:
+                        entry = corrected_cats[entity]
+                        if entry.get('brand_type') == factors.get('brand_type'):
+                            gitem['corrected_from_history'] = True
+                            if entry.get('corrected_path'):
+                                gitem['suggested_path'] = [entry['corrected_path']]
+        for ac in category_result.get('all_codes', []):
+            ac_factors = ac.get('factors', {}) or {}
+            ac_entity = ac_factors.get('entity')
+            if ac_entity and ac_entity in corrected_cats:
+                entry = corrected_cats[ac_entity]
+                if entry.get('brand_type') == ac_factors.get('brand_type'):
+                    ac['corrected_from_history'] = True
+                    if entry.get('corrected_path'):
+                        ac['suggested_path'] = [entry['corrected_path']]
+
+    stats = category_result['stats']
+    total = len(df)
+    brand_missing_count = sum([c.get('count', 0) for c in brand_clusters if c.get('type') == 'missing'])
+    brand_mismatch_count = sum([c.get('count', 0) for c in brand_clusters if c.get('type') == 'mismatch'])
+    need_ai = brand_missing_count + brand_mismatch_count + stats['missing_count']
+
+    lean_clusters_data = lean_clusters(brand_clusters)
+
+    try:
+        with open(filepath, 'rb') as f:
+            file_hash = hashlib.md5(f.read()).hexdigest()[:12]
+    except Exception as e:
+        logger.error(f"Failed to compute file hash: {e}")
+        file_hash = 'unknown'
+
+    sessions[session_id] = {
+        'session_id': session_id,
+        'group_id': group_id,
+        'file_hash': file_hash,
+        'file_path': str(filepath),
+        'col_mapping': col_mapping,
+        'status': 'uploaded',
+        'created': datetime.now(),
+        'brand_rules': {},
+        'new_brands': auto_new_brands,
+        'confirmed_brands': [],
+        'diagnosis_status': 'completed',
+        'diagnosis_result': {
+            'brand_clusters': lean_clusters_data,
+            'conflict_groups': category_result['conflict_groups'],
+            'marketing_groups': category_result['marketing_groups'],
+            'standard_groups': category_result['standard_groups'],
+            'missing_items': category_result['missing_items'],
+            'all_codes': category_result.get('all_codes', []),
+            'cleaned_paths': category_result.get('cleaned_paths', {}),
+            'path_classifications': category_result.get('path_classifications', {}),
+            'category_options': category_result['category_options']
+        },
+        'diagnosis_stats': {
+            'total': int(total),
+            'valid': int(total - need_ai),
+            'brand_missing': int(brand_missing_count),
+            'brand_mismatch': int(brand_mismatch_count),
+            'marketing': int(stats['pure_marketing_count'] + stats['conflict_count']),
+            'need_ai': int(need_ai)
+        }
+    }
+
+    save_session_snapshots(session_id)
+
+    return jsonify({
+        'success': True,
+        'session_id': session_id,
+        'diagnosis': {
+            'brand_clusters': brand_clusters,
+            'conflict_groups': category_result['conflict_groups'],
+            'marketing_groups': category_result['marketing_groups'],
+            'standard_groups': category_result['standard_groups'],
+            'missing_items': category_result['missing_items'],
+            'all_codes': category_result.get('all_codes', []),
+            'cleaned_paths': category_result.get('cleaned_paths', {}),
+            'path_classifications': category_result.get('path_classifications', {}),
+            'category_options': category_result['category_options']
+        },
+        'stats': {
+            'total': int(total),
+            'valid': int(total - need_ai),
+            'brand_missing': int(brand_missing_count),
+            'brand_mismatch': int(brand_mismatch_count),
+            'marketing': int(stats['pure_marketing_count'] + stats['conflict_count']),
+            'need_ai': int(need_ai)
+        },
+        'category_options': category_result['category_options']
+    })
+
+def _process_async_upload(df, temp_filepath, original_filename, group_id):
+    """异步处理大文件"""
+    session_id = f"session_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+    try:
+        with open(temp_filepath, 'rb') as f:
+            file_hash = hashlib.md5(f.read()).hexdigest()[:12]
+    except Exception as e:
+        logger.error(f"Failed to compute file hash: {e}")
+        file_hash = 'unknown'
+
+    # 将临时文件重命名为正式文件名
+    filename = f"{session_id}_{original_filename}"
+    filepath = UPLOAD_FOLDER / filename
+    temp_filepath.rename(filepath)
+
+    # 检查文件是否保存成功
+    if not filepath.exists():
+        return jsonify({'error': '文件保存失败'}), 500
+
+    file_size = filepath.stat().st_size
+    if file_size == 0:
+        return jsonify({'error': '保存的文件为空'}), 500
+
+    # 验证文件完整性
+    is_valid, error_msg = validate_excel_file(filepath)
+    if not is_valid:
+        try:
+            filepath.unlink()
+        except:
+            pass
+        return jsonify({'error': error_msg}), 400
+
+    cols = df.columns.tolist()
+    col_mapping = {}
+
+    for col in cols:
+        col_lower = col.lower()
+        if 'spu_name' in col_lower or '商品名' in col_lower:
+            col_mapping['org_spu_name'] = col
+        elif 'brand' in col_lower or '品牌' in col_lower:
+            col_mapping['brand_name'] = col
+        elif 'spec' in col_lower or '规格' in col_lower:
+            col_mapping['spu_spec'] = col
+        elif 'cate_level1' in col_lower or '一级分类' in col_lower:
+            col_mapping['cate_level1_name'] = col
+        elif 'cate_level2' in col_lower or '二级分类' in col_lower:
+            col_mapping['cate_level2_name'] = col
+        elif 'cate_level3' in col_lower or '三级分类' in col_lower:
+            col_mapping['cate_level3_name'] = col
+        elif 'spu_code' in col_lower or '商品code' in col_lower or ('code' in col_lower and '商品' in col):
+            col_mapping['org_spu_code'] = col
+        elif 'org_image_url' in col_lower or '商品图' in col_lower or '图片' in col_lower:
+            col_mapping['org_image_url'] = col
+
+    if 'org_spu_name' not in col_mapping:
+        return jsonify({'error': '缺少商品名称列'}), 400
+
+    sessions[session_id] = {
+        'session_id': session_id,
+        'group_id': group_id,
+        'file_hash': file_hash,
+        'file_path': str(filepath),
+        'col_mapping': col_mapping,
+        'status': 'uploaded',
+        'diagnosis_status': 'pending',
+        'diagnosis_progress': 0,
+        'diagnosis_logs': [],
+        'created': datetime.now(),
+        'brand_rules': {},
+        'new_brands': [],
+        'confirmed_brands': []
+    }
+
+    thread = threading.Thread(
+        target=diagnose_async,
+        args=(session_id, str(filepath), col_mapping)
+    )
+    thread.start()
+
+    return jsonify({
+        'success': True,
+        'session_id': session_id,
+        'async': True,
+        'message': f'大文件诊断中（{file_size / 1024 / 1024:.1f}MB），请轮询 /api/diagnosis_status 获取进度'
+    })
+
     @app.route('/api/upload', methods=['POST'])
     def upload_file():
         """同步上传（小文件 < 1000 行）"""
@@ -1197,327 +1520,45 @@ def register_routes(app):
             logger.error(f"Upload error: {e}")
             return jsonify({'error': str(e)}), 400
 
-    def _process_sync_upload(df, temp_filepath, original_filename, group_id):
-        """同步处理小文件"""
-        cols = df.columns.tolist()
-        col_mapping = {}
-
-        for col in cols:
-            col_lower = col.lower()
-            if 'spu_name' in col_lower or '商品名' in col_lower:
-                col_mapping['org_spu_name'] = col
-            elif 'brand' in col_lower or '品牌' in col_lower:
-                col_mapping['brand_name'] = col
-            elif 'spec' in col_lower or '规格' in col_lower:
-                col_mapping['spu_spec'] = col
-            elif 'cate_level1' in col_lower or '一级分类' in col_lower:
-                col_mapping['cate_level1_name'] = col
-            elif 'cate_level2' in col_lower or '二级分类' in col_lower:
-                col_mapping['cate_level2_name'] = col
-            elif 'cate_level3' in col_lower or '三级分类' in col_lower:
-                col_mapping['cate_level3_name'] = col
-            elif 'org_image_url' in col_lower or '商品图' in col_lower or '图片' in col_lower:
-                col_mapping['org_image_url'] = col
-
-        if 'org_spu_name' not in col_mapping:
-            try:
-                temp_filepath.unlink()
-            except:
-                pass
-            return jsonify({'error': '缺少商品名称列'}), 400
-
-        session_id = f"session_{int(time.time())}_{uuid.uuid4().hex[:6]}"
-
-        # 将临时文件重命名为正式文件名
-        filename = f"{session_id}_{original_filename}"
-        filepath = UPLOAD_FOLDER / filename
-        temp_filepath.rename(filepath)
-
-        # 自动识别商品code列
-        code_col = None
-        for col in cols:
-            col_lower = col.lower()
-            if 'spu_code' in col_lower or 'code' in col_lower or '商品code' in col_lower or '编码' in col_lower:
-                code_col = col
-                col_mapping['org_spu_code'] = col
-                break
-
-        brand_clusters = BrandClusterEngine.cluster(df, col_mapping['org_spu_name'], col_mapping.get('brand_name'), code_col, col_mapping)
-        name_col = col_mapping.get('org_spu_name')
-        entity_dict = build_entity_dict(df[name_col].dropna().astype(str).tolist()) if name_col else {}
-        category_result = CategoryDetector.analyze(df, col_mapping, entity_dict)
-
-        # 加载持久化的确认和修正规则
-        from ..brands.database import load_corrected_products, load_corrected_brands, load_corrected_categories, find_any_brand, load_dismissed_brands
-        confirmed_rules = load_corrected_products(group_id)
-        corrected_brands = load_corrected_brands()
-        corrected_cats = load_corrected_categories()
-
-        # 将已修正的分类注入分类规则缓存
-        cat_rules_changed = False
-        cache_rules = cache_manager.get_rules(group_id, session_id) or {}
-        cat_rules = cache_rules.get('categories', {})
-        for code, info in confirmed_rules.items():
-            if info.get('category') and code not in cat_rules:
-                cat_rules[code] = {'action': 'confirm', 'replacement': info['category']}
-                cat_rules_changed = True
-        if cat_rules_changed:
-            cache_manager.set_rules(group_id, session_id, {**cache_rules, 'categories': cat_rules})
-
-        # === 自动提取新品牌候选者 (带智能推断) ===
-        auto_new_brands = []
-        seen_new_brands = set()
-        for cluster in brand_clusters:
-            for item in cluster.get('items', []):
-                if item.get('issue_type') == 'new_brand_candidate':
-                    item_code = str(item.get('code', '')).strip()
-                    if item_code in confirmed_rules:
-                        continue
-                    b_name = item['brand']
-                    if b_name and b_name not in seen_new_brands:
-                        if b_name in corrected_brands:
-                            entry = corrected_brands[b_name]
-                            corrected_to = entry['corrected_to']
-                            if find_any_brand(corrected_to)['found']:
-                                item['corrected_from_history'] = True
-                                item['corrected_brand'] = corrected_to
-                                continue
-                            else:
-                                b_name = corrected_to
-                                item['corrected_from_history'] = True
-                                item['corrected_brand'] = corrected_to
-                        if not find_any_brand(b_name)['found']:
-                            if b_name in load_dismissed_brands():
-                                continue
-                            metadata = infer_brand_metadata(item['name'], item.get('category_path', ''))
-
-                            auto_new_brands.append({
-                                'name': b_name,
-                                'aliases': [b_name],
-                                'type': metadata['type'],
-                                'country': metadata['country'],
-                                'suggested_name': metadata['suggested_name'],
-                                'sample_product': item['name'],
-                                'sample_category': item.get('category_path', ''),
-                                'confirmed': False,
-                                'is_slash_brand': '/' in (metadata['suggested_name'] or b_name)
-                            })
-                            seen_new_brands.add(b_name)
-
-        # 品牌列为空时，从 missing 聚类中提取新品牌候选
-        for cluster in brand_clusters:
-            if cluster.get('type') != 'missing':
-                continue
-            b_name = cluster.get('suggested_standard')
-            if not b_name or b_name in seen_new_brands:
-                continue
-            if b_name in corrected_brands:
-                entry = corrected_brands[b_name]
-                corrected_to = entry['corrected_to']
-                if find_any_brand(corrected_to)['found']:
-                    continue
-                b_name = corrected_to
-            if not find_any_brand(b_name)['found']:
-                if b_name in load_dismissed_brands():
-                    continue
-                sample = (cluster.get('items') or [{}])[0]
-                metadata = infer_brand_metadata(sample.get('name', ''), sample.get('category_path', ''))
-                auto_new_brands.append({
-                    'name': b_name,
-                    'aliases': [b_name],
-                    'type': metadata['type'],
-                    'country': metadata['country'],
-                    'suggested_name': metadata['suggested_name'],
-                    'sample_product': sample.get('name', ''),
-                    'sample_category': sample.get('category_path', ''),
-                    'confirmed': False,
-                    'is_slash_brand': '/' in (metadata['suggested_name'] or b_name)
-                })
-                seen_new_brands.add(b_name)
-
-        # 应用分类修正记录
-        if corrected_cats and entity_dict:
-            for group_key in ['missing_items', 'conflict_groups', 'marketing_groups', 'standard_groups']:
-                for group in category_result.get(group_key, []):
-                    for gitem in group.get('items', []):
-                        factors = gitem.get('factors', {}) or {}
-                        entity = factors.get('entity')
-                        if entity and entity in corrected_cats:
-                            entry = corrected_cats[entity]
-                            if entry.get('brand_type') == factors.get('brand_type'):
-                                gitem['corrected_from_history'] = True
-                                if entry.get('corrected_path'):
-                                    gitem['suggested_path'] = [entry['corrected_path']]
-            for ac in category_result.get('all_codes', []):
-                ac_factors = ac.get('factors', {}) or {}
-                ac_entity = ac_factors.get('entity')
-                if ac_entity and ac_entity in corrected_cats:
-                    entry = corrected_cats[ac_entity]
-                    if entry.get('brand_type') == ac_factors.get('brand_type'):
-                        ac['corrected_from_history'] = True
-                        if entry.get('corrected_path'):
-                            ac['suggested_path'] = [entry['corrected_path']]
-
-        stats = category_result['stats']
-        total = len(df)
-        brand_missing_count = sum([c.get('count', 0) for c in brand_clusters if c.get('type') == 'missing'])
-        brand_mismatch_count = sum([c.get('count', 0) for c in brand_clusters if c.get('type') == 'mismatch'])
-        need_ai = brand_missing_count + brand_mismatch_count + stats['missing_count']
-
-        lean_clusters_data = lean_clusters(brand_clusters)
+    @app.route('/api/upload_by_path', methods=['POST'])
+    def upload_by_path():
+        """Upload via file path (Electron native dialog)."""
+        file_path = request.form.get('file_path')
+        group_id = (request.form.get('group_id') or '').strip()
+        if not group_id or group_id not in _groups_cache:
+            return jsonify({'error': '请选择有效的分组'}), 400
+        if not file_path or not Path(file_path).exists():
+            return jsonify({'error': '文件不存在'}), 400
 
         try:
-            with open(filepath, 'rb') as f:
-                file_hash = hashlib.md5(f.read()).hexdigest()[:12]
+            original_filename = Path(file_path).name
+            if not original_filename.lower().endswith(('.xlsx', '.xls')):
+                original_filename += '.xlsx'
+
+            temp_filename = f"temp_{int(time.time())}_{original_filename}"
+            temp_filepath = UPLOAD_FOLDER / temp_filename
+            shutil.copy2(file_path, temp_filepath)
+
+            is_valid, error_msg = validate_excel_file(temp_filepath)
+            if not is_valid:
+                try:
+                    temp_filepath.unlink()
+                except:
+                    pass
+                return jsonify({'error': error_msg}), 400
+
+            df = pd.read_excel(temp_filepath, engine='openpyxl')
+            df = df.replace({np.nan: None})
+
+            if len(df) < 1000:
+                return _process_sync_upload(df, temp_filepath, original_filename, group_id)
+            else:
+                return _process_async_upload(df, temp_filepath, original_filename, group_id)
+
         except Exception as e:
-            logger.error(f"Failed to compute file hash: {e}")
-            file_hash = 'unknown'
+            logger.error(f"Upload by path error: {e}")
+            return jsonify({'error': str(e)}), 400
 
-        sessions[session_id] = {
-            'session_id': session_id,
-            'group_id': group_id,
-            'file_hash': file_hash,
-            'file_path': str(filepath),
-            'col_mapping': col_mapping,
-            'status': 'uploaded',
-            'created': datetime.now(),
-            'brand_rules': {},
-            'new_brands': auto_new_brands,
-            'confirmed_brands': [],
-            'diagnosis_status': 'completed',
-            'diagnosis_result': {
-                'brand_clusters': lean_clusters_data,
-                'conflict_groups': category_result['conflict_groups'],
-                'marketing_groups': category_result['marketing_groups'],
-                'standard_groups': category_result['standard_groups'],
-                'missing_items': category_result['missing_items'],
-                'all_codes': category_result.get('all_codes', []),
-                'cleaned_paths': category_result.get('cleaned_paths', {}),
-                'path_classifications': category_result.get('path_classifications', {}),
-                'category_options': category_result['category_options']
-            },
-            'diagnosis_stats': {
-                'total': int(total),
-                'valid': int(total - need_ai),
-                'brand_missing': int(brand_missing_count),
-                'brand_mismatch': int(brand_mismatch_count),
-                'marketing': int(stats['pure_marketing_count'] + stats['conflict_count']),
-                'need_ai': int(need_ai)
-            }
-        }
-
-        save_session_snapshots(session_id)
-
-        return jsonify({
-            'success': True,
-            'session_id': session_id,
-            'diagnosis': {
-                'brand_clusters': brand_clusters,
-                'conflict_groups': category_result['conflict_groups'],
-                'marketing_groups': category_result['marketing_groups'],
-                'standard_groups': category_result['standard_groups'],
-                'missing_items': category_result['missing_items'],
-                'all_codes': category_result.get('all_codes', []),
-                'cleaned_paths': category_result.get('cleaned_paths', {}),
-                'path_classifications': category_result.get('path_classifications', {}),
-                'category_options': category_result['category_options']
-            },
-            'stats': {
-                'total': int(total),
-                'valid': int(total - need_ai),
-                'brand_missing': int(brand_missing_count),
-                'brand_mismatch': int(brand_mismatch_count),
-                'marketing': int(stats['pure_marketing_count'] + stats['conflict_count']),
-                'need_ai': int(need_ai)
-            },
-            'category_options': category_result['category_options']
-        })
-
-    def _process_async_upload(df, temp_filepath, original_filename, group_id):
-        """异步处理大文件"""
-        session_id = f"session_{int(time.time())}_{uuid.uuid4().hex[:6]}"
-        try:
-            with open(temp_filepath, 'rb') as f:
-                file_hash = hashlib.md5(f.read()).hexdigest()[:12]
-        except Exception as e:
-            logger.error(f"Failed to compute file hash: {e}")
-            file_hash = 'unknown'
-
-        # 将临时文件重命名为正式文件名
-        filename = f"{session_id}_{original_filename}"
-        filepath = UPLOAD_FOLDER / filename
-        temp_filepath.rename(filepath)
-
-        # 检查文件是否保存成功
-        if not filepath.exists():
-            return jsonify({'error': '文件保存失败'}), 500
-
-        file_size = filepath.stat().st_size
-        if file_size == 0:
-            return jsonify({'error': '保存的文件为空'}), 500
-
-        # 验证文件完整性
-        is_valid, error_msg = validate_excel_file(filepath)
-        if not is_valid:
-            try:
-                filepath.unlink()
-            except:
-                pass
-            return jsonify({'error': error_msg}), 400
-
-        cols = df.columns.tolist()
-        col_mapping = {}
-
-        for col in cols:
-            col_lower = col.lower()
-            if 'spu_name' in col_lower or '商品名' in col_lower:
-                col_mapping['org_spu_name'] = col
-            elif 'brand' in col_lower or '品牌' in col_lower:
-                col_mapping['brand_name'] = col
-            elif 'spec' in col_lower or '规格' in col_lower:
-                col_mapping['spu_spec'] = col
-            elif 'cate_level1' in col_lower or '一级分类' in col_lower:
-                col_mapping['cate_level1_name'] = col
-            elif 'cate_level2' in col_lower or '二级分类' in col_lower:
-                col_mapping['cate_level2_name'] = col
-            elif 'cate_level3' in col_lower or '三级分类' in col_lower:
-                col_mapping['cate_level3_name'] = col
-            elif 'spu_code' in col_lower or '商品code' in col_lower or ('code' in col_lower and '商品' in col):
-                col_mapping['org_spu_code'] = col
-            elif 'org_image_url' in col_lower or '商品图' in col_lower or '图片' in col_lower:
-                col_mapping['org_image_url'] = col
-
-        if 'org_spu_name' not in col_mapping:
-            return jsonify({'error': '缺少商品名称列'}), 400
-
-        sessions[session_id] = {
-            'session_id': session_id,
-            'group_id': group_id,
-            'file_hash': file_hash,
-            'file_path': str(filepath),
-            'col_mapping': col_mapping,
-            'status': 'uploaded',
-            'diagnosis_status': 'pending',
-            'diagnosis_progress': 0,
-            'diagnosis_logs': [],
-            'created': datetime.now(),
-            'brand_rules': {},
-            'new_brands': [],
-            'confirmed_brands': []
-        }
-
-        thread = threading.Thread(
-            target=diagnose_async,
-            args=(session_id, str(filepath), col_mapping)
-        )
-        thread.start()
-
-        return jsonify({
-            'success': True,
-            'session_id': session_id,
-            'async': True,
-            'message': f'大文件诊断中（{file_size / 1024 / 1024:.1f}MB），请轮询 /api/diagnosis_status 获取进度'
-        })
 
     @app.route('/api/recent_files')
     def get_recent_files():

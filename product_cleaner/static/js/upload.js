@@ -1,66 +1,110 @@
+// ===== Electron native file dialog support =====
+async function triggerFileSelect() {
+    if (window.electronAPI) {
+        const filePath = await window.electronAPI.openFileDialog();
+        if (!filePath) return null; // user cancelled
+        return { mode: 'electron', path: filePath };
+    } else {
+        // Web fallback: trigger browser file input
+        return new Promise((resolve) => {
+            const fi = document.getElementById('fileInput');
+            const origOnChange = fi.onchange;
+            fi.onchange = function(e) {
+                fi.onchange = origOnChange;
+                resolve({ mode: 'web', file: e.target.files[0] });
+            };
+            fi.click();
+        });
+    }
+}
+
+async function doUpload() {
+    const groupId = document.getElementById('uploadGroup').value || '';
+    if (!groupId) {
+        document.getElementById('uploadMsg').textContent = '请先选择分组';
+        return;
+    }
+
+    const result = await triggerFileSelect();
+    if (!result) return;
+
+    document.getElementById('uploadMsg').textContent = '⏳ 正在上传...';
+
+    if (result.mode === 'electron') {
+        // Send file path to server
+        const formData = new FormData();
+        formData.append('file_path', result.path);
+        formData.append('group_id', groupId);
+
+        try {
+            const res = await fetch('/api/upload_by_path', { method: 'POST', body: formData });
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || '服务器响应错误');
+            }
+            const data = await res.json();
+            handleUploadResponse(data);
+        } catch (err) {
+            document.getElementById('uploadMsg').textContent = '❌ 上传失败: ' + err.message;
+        }
+        return;
+    }
+
+    // Web mode: use existing FormData with file
+    const formData = new FormData();
+    formData.append('file', result.file);
+    formData.append('group_id', groupId);
+
+    try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || '服务器响应错误');
+        }
+        const data = await res.json();
+        handleUploadResponse(data);
+    } catch (err) {
+        document.getElementById('uploadMsg').textContent = '❌ 上传失败: ' + err.message;
+    }
+}
+
+// Shared upload response handler
+function handleUploadResponse(data) {
+    console.log('上传成功，服务器响应:', data);
+
+    sessionId = data.session_id;
+    localStorage.setItem('last_session_id', sessionId);
+
+    if (data.async) {
+        document.getElementById('uploadMsg').textContent = '⏳ ' + data.message;
+        document.getElementById('uploadSection').classList.add('hidden');
+        document.getElementById('diagnosisSection').classList.remove('hidden');
+        document.getElementById('progressSection').classList.remove('hidden');
+        document.getElementById('statsSection').classList.add('opacity-50');
+        document.getElementById('progressText').textContent = data.message;
+        pollDiagnosisStatus();
+    } else {
+        diagnosisData = data.diagnosis;
+        document.getElementById('uploadSection').classList.add('hidden');
+        document.getElementById('diagnosisSection').classList.remove('hidden');
+        document.getElementById('progressSection').classList.add('hidden');
+        showDiagnosis(data);
+    }
+    loadRecentFiles(); // 刷新列表
+}
+
 // ===== 上传模块 =====
 (function() {
     const uploadBtn = document.getElementById('uploadBtn');
     const fileInput = document.getElementById('fileInput');
-    
+
     // 初始化加载最近文件
     loadRecentFiles();
 
     if (uploadBtn && fileInput) {
-        // 物理点击绑定（双重保险）
+        // 物理点击绑定
         uploadBtn.onclick = function() {
-            fileInput.click();
-        };
-
-        fileInput.onchange = async function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            console.log('开始上传文件:', file.name);
-            document.getElementById('uploadMsg').textContent = '⏳ 正在上传...';
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('group_id', document.getElementById('uploadGroup').value || '');
-            
-            // 清除 input 值，允许再次选择同一文件进行测试
-            fileInput.value = '';
-            
-            try {
-                const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                
-                if (!res.ok) {
-                    const errorData = await res.json();
-                    throw new Error(errorData.error || '服务器响应错误');
-                }
-                
-                const data = await res.json();
-                console.log('上传成功，服务器响应:', data);
-                
-                sessionId = data.session_id;
-                localStorage.setItem('last_session_id', sessionId);
-                
-                if (data.async) {
-                    document.getElementById('uploadMsg').textContent = '⏳ ' + data.message;
-                    document.getElementById('uploadSection').classList.add('hidden');
-                    document.getElementById('diagnosisSection').classList.remove('hidden');
-                    document.getElementById('progressSection').classList.remove('hidden');
-                    document.getElementById('statsSection').classList.add('opacity-50');
-                    document.getElementById('progressText').textContent = data.message;
-                    pollDiagnosisStatus();
-                } else {
-                    diagnosisData = data.diagnosis;
-                    document.getElementById('uploadSection').classList.add('hidden');
-                    document.getElementById('diagnosisSection').classList.remove('hidden');
-                    document.getElementById('progressSection').classList.add('hidden');
-                    showDiagnosis(data);
-                }
-                loadRecentFiles(); // 刷新列表
-            } catch (err) {
-                console.error('上传过程中发生错误:', err);
-                document.getElementById('uploadMsg').textContent = '❌ 上传失败: ' + err.message;
-                alert('上传失败: ' + err.message);
-            }
+            doUpload();
         };
     }
 })();
