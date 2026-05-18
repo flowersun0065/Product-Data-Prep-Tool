@@ -65,6 +65,14 @@ SNAPSHOT_DIR = CACHE_FOLDER / 'session_snapshots'
 # Session 快照保留天数，超过此期限的旧 session 启动时自动清理
 MAX_SESSION_DAYS = 1
 # 诊断超时：processing 状态超过此时间视为失效，重新诊断
+
+# Electron mode data directory (set by run_server.py --electron)
+_electron_data_dir = None
+
+def set_electron_data_dir(path: str):
+    global _electron_data_dir
+    _electron_data_dir = path
+
 SESSION_PROCESSING_TIMEOUT = timedelta(minutes=30)
 
 def _serialize_session(sess: Dict) -> Dict:
@@ -1092,6 +1100,52 @@ def register_routes(app):
     def review_page():
         from ..templates.html_templates import REVIEW_TEMPLATE
         return render_template_string(REVIEW_TEMPLATE)
+
+    @app.route('/api/shutdown', methods=['POST'])
+    def shutdown():
+        """Gracefully shut down the Flask server (called by Electron on quit)."""
+        import os, signal
+        os.kill(os.getpid(), signal.SIGTERM)
+        return jsonify({'success': True})
+
+    @app.route('/api/settings', methods=['GET'])
+    def get_settings():
+        """Return current settings."""
+        settings_file = Path(_electron_data_dir) / 'settings.json' if _electron_data_dir else None
+        defaults = {
+            'ai_provider': 'gemini',
+            'model_id': 'gemini-2.0-flash',
+            'api_key': '',
+            'batch_size': 20,
+            'detail_mode': 'sidebar',
+            'theme': 'system',
+            'language': 'zh',
+            'startup_action': 'upload',
+        }
+        if settings_file and settings_file.exists():
+            saved = json.load(open(settings_file))
+            defaults.update(saved)
+        return jsonify(defaults)
+
+    @app.route('/api/settings', methods=['PUT'])
+    def save_settings():
+        """Save settings."""
+        if not _electron_data_dir:
+            return jsonify({'error': 'No data directory configured'}), 500
+        settings_file = Path(_electron_data_dir) / 'settings.json'
+        with open(settings_file, 'w') as f:
+            json.dump(request.json, f, ensure_ascii=False, indent=2)
+        return jsonify({'success': True})
+
+    @app.route('/api/venv-status')
+    def venv_status():
+        """Check if Python virtual environment is ready."""
+        import sys
+        return jsonify({
+            'ready': True,
+            'python_version': sys.version,
+            'data_dir': str(_electron_data_dir) if _electron_data_dir else '',
+        })
 
     @app.route('/api/upload', methods=['POST'])
     def upload_file():
