@@ -43,3 +43,13 @@ history/
 # Virtual environment
 venv/
 .env
+.superpowers/
+
+# Node / Electron
+node_modules/
+dist/
+
+# Electron build artifacts
+*.dmg
+*.exe
+*.nsis

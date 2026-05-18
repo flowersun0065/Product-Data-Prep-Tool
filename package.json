@@ -1,0 +1,16 @@
+{
+  "name": "product-cleaner",
+  "version": "1.0.0",
+  "description": "产品数据清洗工具",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

@@ -1,0 +1,32 @@
+appId: com.productcleaner.app
+productName: "产品数据清洗工具"
+copyright: "Copyright © 2026"
+
+mac:
+  category: public.app-category.utilities
+  target:
+    - dmg
+  artifactName: "${productName}-${version}-mac.${ext}"
+
+win:
+  target:
+    - nsis
+  artifactName: "${productName}-${version}-win.${ext}"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+files:
+  - electron/**/*
+  - product_cleaner/**/*
+  - run_server.py
+  - requirements.txt
+  - "!**/__pycache__/**"
+  - "!**/*.pyc"
+  - "!product_cleaner/uploads/**"
+  - "!product_cleaner/results/**"
+  - "!product_cleaner/cache/**"
+  - "!product_cleaner/corrections/**"
+
+asar: false
