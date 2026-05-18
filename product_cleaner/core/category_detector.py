@@ -18,7 +18,7 @@ from ..categories.path_cleaner import clean_paths, build_raw_paths, is_marketing
 
 # 品种分组 → L1 关键词映射
 from .lexicon import VARIETY_GROUP_L1, CATEGORY_GROUP_CN
-from .product_parser import clean_product_name, clean_product_name_strict, find_entity, classify_word, SpecExtractor
+from .product_parser import clean_product_name, clean_product_name_strict, find_entity, classify_word, SpecExtractor, extract_modifiers
 
 class CategoryDetector:
     """分类检测引擎"""
@@ -347,14 +347,6 @@ class CategoryDetector:
             from ..core.brand_checker import BrandConsistencyChecker
             from ..core.lexicon import NOT_BRAND_CATEGORIES as NBC
             from ..brands.database import BRAND_DATABASE_V6
-            _modifier_words = set()
-            for cat_val in NBC.values():
-                if isinstance(cat_val, dict):
-                    for sub in cat_val.values():
-                        if isinstance(sub, (set, list)):
-                            _modifier_words.update(w for w in sub if isinstance(w, str) and len(w) >= 2)
-                elif isinstance(cat_val, (set, list)):
-                    _modifier_words.update(w for w in cat_val if isinstance(w, str) and len(w) >= 2)
             _all_items = []
             for cl in [missing_codes, conflict_codes, pure_marketing_codes, standard_codes]:
                 _all_items.extend(cl)
@@ -369,7 +361,12 @@ class CategoryDetector:
                 chars = ''.join(c for c in cleaned_name if '\u4e00' <= c <= '\u9fff')
                 if not chars:
                     continue
-                entity, _ = find_entity(chars, entity_dict)
+                # 从原始标准路径提取 L3 token 辅助 entity 排序
+                known_tokens = set()
+                for p in item.get('standard_paths', []):
+                    l3 = p.split(' > ')[-1]
+                    known_tokens.update(t for t in l3.split('/') if len(t) >= 2)
+                entity, _ = find_entity(chars, entity_dict, known_tokens or None)
                 brand, _ = BrandConsistencyChecker._extract_from_name_v6(name)
                 brand_type = ''
                 if brand:
@@ -383,16 +380,7 @@ class CategoryDetector:
                     brand_chars = ''.join(c for c in brand if '\u4e00' <= c <= '\u9fff')
                     if brand_chars:
                         remaining = remaining.replace(brand_chars, '', 1)
-                modifiers = sorted(w for w in _modifier_words if remaining and w in remaining)
-                modifier_detail = []
-                if remaining:
-                    for w in sorted(_modifier_words):
-                        if w in remaining:
-                            gk, sk = classify_word(w, NBC)
-                            _type = CATEGORY_GROUP_CN.get(gk, '')
-                            if sk and sk != gk:
-                                _type = f"{_type}-{sk}" if _type else sk
-                            modifier_detail.append({'value': w, 'type': _type if _type else gk})
+                modifiers, modifier_detail = extract_modifiers(remaining, NBC)
 
                 entity_type = ''
                 entity_subtype = ''
@@ -533,36 +521,11 @@ class CategoryDetector:
             if brand_chars:
                 remaining = remaining.replace(brand_chars, '', 1)
         modifiers = set()
-        if remaining:
-            for cat_key, cat_val in NBC.items():
-                words_pool = set()
-                if isinstance(cat_val, dict):
-                    for sub in cat_val.values():
-                        if isinstance(sub, (set, list)):
-                            words_pool.update(w for w in sub if isinstance(w, str) and len(w) >= 2)
-                elif isinstance(cat_val, (set, list)):
-                    words_pool.update(w for w in cat_val if isinstance(w, str) and len(w) >= 2)
-                for w in words_pool:
-                    if w in remaining:
-                        modifiers.add(w)
-
         modifier_detail = []
         if remaining:
-            for cat_key, cat_val in NBC.items():
-                words_pool = set()
-                if isinstance(cat_val, dict):
-                    for sub in cat_val.values():
-                        if isinstance(sub, (set, list)):
-                            words_pool.update(w for w in sub if isinstance(w, str) and len(w) >= 2)
-                elif isinstance(cat_val, (set, list)):
-                    words_pool.update(w for w in cat_val if isinstance(w, str) and len(w) >= 2)
-                for w in sorted(words_pool):
-                    if w in remaining and w in modifiers:
-                        gk, sk = classify_word(w, NBC)
-                        _type = CATEGORY_GROUP_CN.get(gk, '')
-                        if sk and sk != gk:
-                            _type = f"{_type}-{sk}" if _type else sk
-                        modifier_detail.append({'value': w, 'type': _type if _type else gk})
+            mods, detail = extract_modifiers(remaining, NBC)
+            modifiers = set(mods)
+            modifier_detail = detail
 
         entity_type = ''
         entity_subtype = ''

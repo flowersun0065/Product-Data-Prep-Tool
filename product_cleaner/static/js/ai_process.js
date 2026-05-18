@@ -82,7 +82,8 @@ async function startAIProcessing() {
                 provider: provider,
                 api_key: apiKey,
                 model_id: modelId,
-                batch_size: 20
+                batch_size: 20,
+                force_reanalyze: document.getElementById('aiForceReanalyze').checked
             })
         });
         const data = await res.json();
@@ -96,6 +97,11 @@ async function startAIProcessing() {
 
     // 6. 连接成功，改为处理中
     showAIHeaderStatus('AI处理中...', 'bg-cyan-500');
+
+    // 处理中即可打开复核页
+    document.getElementById('aiReviewBtn').classList.remove('hidden');
+    document.getElementById('aiCompleteActions').classList.remove('hidden');
+    document.getElementById('aiDownloadBtn').classList.add('hidden');
 
     // 7. 开始轮询
     aiPollTimer = setInterval(pollAIProgress, 1500);
@@ -299,6 +305,7 @@ function onAIComplete(data) {
     document.getElementById('aiProgressPercent').textContent = '100';
     document.getElementById('aiCancelBtn').classList.add('hidden');
     document.getElementById('aiCompleteActions').classList.remove('hidden');
+    document.getElementById('aiDownloadBtn').classList.remove('hidden');
 
     // 头部状态 → 短暂显示完成，然后隐藏
     showAIHeaderStatus('✅ AI处理完成', 'bg-emerald-500');

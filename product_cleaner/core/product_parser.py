@@ -17,8 +17,50 @@ import re
 from typing import Dict, List, Tuple, Optional
 from collections import defaultdict
 
+import jieba
+
 from .lexicon import (SPEC_UNITS_PATTERN, NOT_BRAND_WORDS, SIZE_PREFIXES,
-    WEIGHT_UNITS_PATTERN, PACK_UNITS_PATTERN, CATEGORY_GROUP_CN)
+    WEIGHT_UNITS_PATTERN, PACK_UNITS_PATTERN, CATEGORY_GROUP_CN,
+    NOT_BRAND_CATEGORIES as _NBC, TYPE_MAP, COUNTRY_MAP)
+
+
+def infer_brand_metadata(product_name: str, category_path: str) -> Dict:
+    """从商品名和分类路径推断品牌元数据（类型、国家、斜杠模式）"""
+    metadata = {
+        'type': '未知',
+        'country': 'CN',
+        'suggested_name': None
+    }
+
+    name_clean = str(product_name)
+    path_clean = str(category_path).lower()
+
+    # 1. 探测斜杠模式 (EN/CN 或 CN/EN)
+    slash_match = re.search(r'^([a-zA-Z0-9\s\'\.\&\-]+)[/／]([一-鿿\s]+)', name_clean)
+    if not slash_match:
+        slash_match = re.search(r'^([一-鿿\s]+)[/／]([a-zA-Z0-9\s\'\.\&\-]+)', name_clean)
+
+    if slash_match:
+        metadata['suggested_name'] = slash_match.group(0).strip()
+
+    # 2. 推断类型（根据分类路径关键词）
+    best_type = '未知'
+    best_score = 0
+    for b_type, keywords in TYPE_MAP.items():
+        score = sum(1 for kw in keywords if kw in path_clean)
+        if score > best_score:
+            best_score = score
+            best_type = b_type
+    metadata['type'] = best_type
+
+    # 3. 推断国家（根据商品名关键词）
+    for code, keywords in COUNTRY_MAP.items():
+        if any(kw in name_clean for kw in keywords):
+            metadata['country'] = code
+            break
+
+    return metadata
+
 
 # ====================================================================
 # 常量
@@ -164,28 +206,78 @@ def build_entity_dict(names: List[str]) -> dict:
     return entity_dict
 
 
-def find_entity(chars: str, entity_dict: dict) -> Tuple[Optional[str], str]:
+def _is_variety_entity(word: str) -> bool:
+    """查词库：word 是否属于 variety（品种）"""
+    gk, _ = classify_word(word, _NBC)
+    return gk == 'variety'
+
+
+# 预构建：词库 variety 组的展平集合（缓存避免每次重建）
+_VARIETY_WORDS = None
+
+
+def _get_variety_words() -> set:
+    """返回 NOT_BRAND_CATEGORIES 中 variety 组的所有品类词"""
+    global _VARIETY_WORDS
+    if _VARIETY_WORDS is not None:
+        return _VARIETY_WORDS
+    _VARIETY_WORDS = set()
+    vdata = _NBC.get('variety', {})
+    for sub_val in vdata.values():
+        if isinstance(sub_val, dict):
+            for words in sub_val.values():
+                if isinstance(words, (set, list)):
+                    _VARIETY_WORDS.update(w for w in words if isinstance(w, str) and len(w) >= 2)
+        elif isinstance(sub_val, (set, list)):
+            _VARIETY_WORDS.update(w for w in sub_val if isinstance(w, str) and len(w) >= 2)
+    return _VARIETY_WORDS
+
+
+def _collect_variety_candidates(chars: str) -> set:
+    """收集 chars 中所有被词库归为 variety 的候选词（jieba token + 词库直查）"""
+    candidates = set()
+
+    # 1. jieba token 查 classify_word
+    for token in jieba.lcut(chars):
+        token = token.strip()
+        if len(token) >= 2:
+            gk, _ = classify_word(token, _NBC)
+            if gk == 'variety':
+                candidates.add(token)
+
+    # 2. 词库 variety 组中出现在 chars 内的完整词
+    for w in _get_variety_words():
+        if w in chars:
+            candidates.add(w)
+
+    return candidates
+
+
+def find_entity(chars: str, entity_dict: dict, known_tokens: set = None) -> Tuple[Optional[str], str]:
     """
     从纯中文字符串末尾匹配实体。
 
-    匹配策略（按优先级）：
-      1. 在 entity_dict 中查找（最长优先，需要跨商品出现 >= 2 次）
-      2. 兜底：取末尾 2 字作为粗略实体
-
-    跳过完整字符串匹配（长度>6时），避免品牌名+实体名整体被当实体。
+    策略：
+      1. 后缀频率匹配 → 所有通过 count >= 2 的候选
+      2. jieba token + 词库 variety 组 → 所有品种候选
+      3. 兜底：末尾 2 字
+      4. 用 known_tokens + variety 属性统一排序，选最优
 
     Args:
         chars: 纯中文字符串
         entity_dict: 由 build_entity_dict() 预构建的实体词典
+        known_tokens: 该商品原始路径 L3 的 / 分隔 token 集合（辅助排序）
 
     Returns:
         tuple: (entity, prefix)
-          - entity: 匹配到的实体名（不会为 None，总有兜底）
-          - prefix: 实体前面的文字（可能为空字符串）
     """
     if not chars or len(chars) < 2:
         return None, ''
 
+    # ── 收集所有候选 ──
+    candidates = {}  # {entity: prefix}
+
+    # 1. 后缀频率匹配候选
     max_len = min(15, len(chars))
     for length in range(max_len, 1, -1):
         suffix = chars[-length:]
@@ -193,12 +285,42 @@ def find_entity(chars: str, entity_dict: dict) -> Tuple[Optional[str], str]:
             continue
         if entity_dict.get(suffix, 0) >= 2:
             prefix = chars[:-length] if chars[:-length] else ''
-            return suffix, prefix
+            candidates[suffix] = prefix
 
-    # 兜底：取末尾 2 字作为粗略实体
-    entity = chars[-2:]
-    prefix = chars[:-2] if len(chars) > 2 else ''
-    return entity, prefix
+    # 2. jieba + 词库品种候选
+    for c in _collect_variety_candidates(chars):
+        if c not in candidates:
+            idx = chars.index(c)
+            candidates[c] = chars[:idx] if idx > 0 else ''
+
+    # 3. 兜底
+    fallback = chars[-2:]
+    if fallback not in candidates:
+        candidates[fallback] = chars[:-2] if len(chars) > 2 else ''
+
+    # ── 统一排序 ──
+    def _score(entity):
+        s = 0
+        gk, _ = classify_word(entity, _NBC)
+        if gk == 'variety':
+            s += 10  # 品种词
+        elif known_tokens:
+            # 完整匹配
+            if entity in known_tokens:
+                s += 5
+            # 候选是已知 token 的子串
+            elif any(entity in kt for kt in known_tokens if len(kt) >= 2):
+                s += 3
+            # 已知 token 是候选的子串
+            elif any(kt in entity for kt in known_tokens if len(kt) >= 2):
+                s += 2
+            # 字符重叠
+            elif any(set(entity) & set(kt) for kt in known_tokens):
+                s += 1
+        return s
+
+    best = max(candidates.keys(), key=lambda e: (_score(e), len(e)))
+    return best, candidates[best]
 
 
 # ====================================================================
@@ -364,3 +486,43 @@ def classify_word(word: str, categories: dict) -> Tuple[str, str]:
             if word in cat_val:
                 return cat_key, ''
     return '', ''
+
+
+def extract_modifiers(remaining: str, categories: dict = None) -> tuple:
+    """
+    用 jieba 分词从 remaining 中提取修饰词。
+
+    参数:
+        remaining: 商品名去除 entity 和 brand 后的纯中文字符串
+        categories: NOT_BRAND_CATEGORIES 词库（不传则 import 默认词库）
+
+    返回:
+        (modifiers, modifier_detail)
+          - modifiers: list[str]，在词库中有分类的词（用于 scoring）
+          - modifier_detail: list[dict]，所有 token 及分类（用于显示）
+    """
+    if not remaining:
+        return [], []
+
+    cat = categories if categories is not None else _NBC
+
+    modifiers = []
+    seen = set()
+    modifier_detail = []
+
+    for token in jieba.lcut(remaining):
+        token = token.strip()
+        if len(token) < 2 or token in seen:
+            continue
+        seen.add(token)
+        gk, sk = classify_word(token, cat)
+        if gk:
+            modifiers.append(token)
+            _type = CATEGORY_GROUP_CN.get(gk, '')
+            if sk and sk != gk:
+                _type = f"{_type}-{sk}" if _type else sk
+        else:
+            _type = ''
+        modifier_detail.append({'value': token, 'type': _type})
+
+    return sorted(set(modifiers)), modifier_detail

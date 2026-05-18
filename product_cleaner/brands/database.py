@@ -29,13 +29,21 @@ from pathlib import Path
 # 动态品牌持久化文件路径
 DYNAMIC_BRANDS_FILE = Path(__file__).parent / 'dynamic_brands.json'
 DISMISSED_BRANDS_FILE = Path(__file__).parent / 'dismissed_brands.json'
-CORRECTED_PRODUCTS_FILE = Path(__file__).parent.parent / 'corrections' / 'corrected_products.json'
+def _corrected_products_path(group_id: str) -> Path:
+    import logging
+    _logger = logging.getLogger(__name__)
+    if not group_id:
+        _logger.warning("_corrected_products_path called with empty group_id")
+    d = Path(__file__).parent.parent / 'corrections' / group_id
+    d.mkdir(parents=True, exist_ok=True)
+    return d / 'corrected_products.json'
 CORRECTED_BRANDS_FILE = Path(__file__).parent.parent / 'corrections' / 'corrected_brands.json'
 CORRECTED_CATEGORIES_FILE = Path(__file__).parent.parent / 'corrections' / 'corrected_categories.json'
 RELATIONSHIPS_FILE = Path(__file__).parent / 'relationships.json'
 
 BRAND_DATABASE_V6 = {
     '盒马': {'aliases': ['盒马', '盒马/盒马', 'HM', '盒马有机'], 'type': '自有品牌', 'country': 'CN'},
+    '小象': {'aliases': ['小象'], 'type': '自有品牌', 'country': 'CN'},
     '农夫山泉': {'aliases': ['农夫山泉', 'NONGFU SPRING', '农夫'], 'type': '饮水', 'country': 'CN'},
     '乐事': {'aliases': ['乐事', "Lay's", "Lay's/乐事"], 'type': '零食', 'country': 'US'},
     '三得利': {'aliases': ['三得利', 'SUNTORY', 'Suntory', 'SUNTORY/三得利'], 'type': '饮料', 'country': 'JP'},
@@ -62,7 +70,7 @@ BRAND_DATABASE_V6 = {
     '家乐': {'aliases': ['家乐', 'Knorr'], 'type': '调味', 'country': 'NL'},
     '哈根达斯': {'aliases': ['哈根达斯', 'Häagen-Dazs'], 'type': '冰淇淋', 'country': 'US'},
     '得宝': {'aliases': ['得宝', 'Tempo', 'Tempo/得宝'], 'type': '纸品', 'country': 'DE'},
-    '麒麟': {'aliases': ['麒麟', 'Kirin'], 'type': '饮料', 'country': 'JP'},
+    '麒麟': {'aliases': ['麒麟', 'Kirin','麒麟一番榨'], 'type': '饮料', 'country': 'JP'},
     '狮王': {'aliases': ['狮王', 'LION', 'LION/狮王'], 'type': '日化', 'country': 'JP'},
     '德亚': {'aliases': ['德亚', 'Weidendorf'], 'type': '乳品', 'country': 'DE'},
     '歌帝梵': {'aliases': ['歌帝梵', 'Godiva'], 'type': '巧克力', 'country': 'BE'},
@@ -1373,6 +1381,10 @@ BRAND_DATABASE_V6 = {
     '心相印': {'aliases': ['心相印'], 'type': '纸品', 'country': 'CN'},
     '盒马火锅': {'aliases': ['盒马火锅'], 'type': '火锅食材', 'country': 'CN'},
     '家佳康': {'aliases': ['家佳康'], 'type': '肉禽蛋', 'country': 'CN'},
+    '唐宗筷': {'aliases': ['唐宗筷'], 'type': '厨房用品', 'country': 'CN'},
+    '清风': {'aliases': ['清风'], 'type': '未知', 'country': 'CN'},
+    '象大厨': {'aliases': ['象大厨'], 'type': '熟食', 'country': 'CN'},
+    '象小家': {'aliases': ['象小家'], 'type': '日化', 'country': 'CN'},
 }
 
 
@@ -1432,44 +1444,48 @@ def save_dismissed_brand(brand_name: str):
         _atomic_json_save(DISMISSED_BRANDS_FILE, dismissed)
 
 
-def load_corrected_products() -> dict:
-    """加载已修正的商品规则（code → {brand/category}）"""
-    if CORRECTED_PRODUCTS_FILE.exists():
+def load_corrected_products(group_id: str) -> dict:
+    """加载已修正的商品规则（code → {brand/category}，按分组隔离）"""
+    path = _corrected_products_path(group_id)
+    if path.exists():
         try:
-            with open(CORRECTED_PRODUCTS_FILE, 'r', encoding='utf-8') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception:
             return {}
     return {}
 
 
-def save_corrected_product(code: str, rule: dict):
+def save_corrected_product(group_id: str, code: str, rule: dict):
     """保存单条商品修正记录"""
+    path = _corrected_products_path(group_id)
     with _save_lock:
-        rules = load_corrected_products()
+        rules = load_corrected_products(group_id)
         if code in rules:
             rules[code].update(rule)
         else:
             rules[code] = rule
-        _atomic_json_save(CORRECTED_PRODUCTS_FILE, rules)
+        _atomic_json_save(path, rules)
 
 
-def batch_save_corrected_products(updates: dict):
+def batch_save_corrected_products(group_id: str, updates: dict):
     """批量更新：读一次，合并所有，写一次"""
+    path = _corrected_products_path(group_id)
     with _save_lock:
-        rules = load_corrected_products()
+        rules = load_corrected_products(group_id)
         for code, rule in updates.items():
             if code in rules:
                 rules[code].update(rule)
             else:
                 rules[code] = rule
-        _atomic_json_save(CORRECTED_PRODUCTS_FILE, rules)
+        _atomic_json_save(path, rules)
 
 
-def clear_corrected_products():
+def clear_corrected_products(group_id: str):
     """清空所有商品修正记录"""
+    path = _corrected_products_path(group_id)
     with _save_lock:
-        _atomic_json_save(CORRECTED_PRODUCTS_FILE, {})
+        _atomic_json_save(path, {})
 
 
 def load_corrected_brands() -> dict:

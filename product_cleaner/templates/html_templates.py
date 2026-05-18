@@ -12,6 +12,18 @@ HTML_TEMPLATE = '''
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>商品数据清理系统 </title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+                    colors: {
+                        brand: { 400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488', 700: '#0f766e' },
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         .marketing-tag { background: #dc2626; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
         .valid-tag { background: #16a34a; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
@@ -67,27 +79,43 @@ HTML_TEMPLATE = '''
         .new-brands-sidebar { position: fixed; top: 80px; right: 20px; width: 340px; max-height: calc(100vh - 100px); background: rgba(30,41,59,0.95); backdrop-filter: blur(10px); border: 1px solid rgba(71,85,105,0.5); border-radius: 12px; padding: 16px; z-index: 900; display: flex; flex-direction: column; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); overflow: hidden; }
         .new-brands-sidebar.hidden { display: none; }
         .sidebar-list { overflow-y: auto; flex: 1; margin-top: 12px; min-height: 0; }
+        select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; padding-right: 30px !important; cursor: pointer; }
+        select::-ms-expand { display: none; }
+        select optgroup, select option { background: #1e293b; color: #e2e8f0; }
     </style>
 </head>
 <body class="bg-slate-900 min-h-screen text-white antialiased">
 
-<!-- 顶部导航栏，稳定页面骨架 -->
-<header class="bg-slate-800 border-b border-slate-700/50 sticky top-0 z-50 h-16">
+<!-- 顶部导航栏 -->
+<header class="bg-slate-800/95 border-b border-slate-700/40 sticky top-0 z-50 h-14">
     <div class="max-w-[1600px] mx-auto px-6 h-full flex items-center justify-between">
-        <h1 class="text-lg font-bold text-slate-100 flex items-center gap-2 tracking-tight">
+        <h1 class="text-sm font-semibold text-slate-100 flex items-center gap-2.5">
+            <span class="w-6 h-6 rounded-md bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-[11px] font-bold text-white shadow-sm">P</span>
             商品数据清理系统
         </h1>
-        <div class="flex items-center gap-4 text-sm text-slate-400">
-            <span class="text-slate-400"> 导入 → 诊断 → 标准化 → 预览 → AI处理 → 确认</span>
-            <div id="saveIndicator" class="flex items-center text-xs text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded opacity-0 transition-opacity duration-300">
-                <span class="flex h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
-                自动保存中...
+        <div class="flex items-center gap-3 text-[11px] text-slate-400">
+            <div class="hidden lg:flex items-center gap-0.5">
+                <span class="flex items-center gap-1 px-2 py-1 rounded bg-slate-700/60 text-slate-200"><svg class="w-3.5 h-3.5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>导入</span>
+                <svg class="w-3 h-3 mx-1 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span class="flex items-center gap-1 px-2 py-1 rounded text-slate-400"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/></svg>诊断</span>
+                <svg class="w-3 h-3 mx-1 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span class="flex items-center gap-1 px-2 py-1 rounded text-slate-400"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>标准化</span>
+                <svg class="w-3 h-3 mx-1 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span class="flex items-center gap-1 px-2 py-1 rounded text-slate-400"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>预览</span>
+                <svg class="w-3 h-3 mx-1 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span class="flex items-center gap-1 px-2 py-1 rounded bg-brand-500/15 text-brand-400 font-medium"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"/></svg>AI处理</span>
+                <svg class="w-3 h-3 mx-1 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span class="flex items-center gap-1 px-2 py-1 rounded text-slate-400"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>确认</span>
             </div>
-            <div id="aiHeaderStatus" class="flex items-center text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded hidden">
-                <span class="flex h-2 w-2 rounded-full bg-cyan-500 mr-2 animate-pulse"></span>
-                <span id="aiHeaderStatusText">AI处理中...</span>
+            <div id="saveIndicator" class="flex items-center text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded opacity-0 transition-opacity duration-300 whitespace-nowrap">
+                <span class="flex h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+                自动保存中
             </div>
-            <button onclick="exitDiagnosis()" class="px-3 py-1.5 bg-slate-700 hover:bg-red-600 rounded text-sm text-slate-300 hover:text-white whitespace-nowrap transition-colors">
+            <div id="aiHeaderStatus" class="flex items-center text-[10px] text-brand-400 bg-brand-400/10 px-2 py-1 rounded hidden whitespace-nowrap">
+                <span class="flex h-1.5 w-1.5 rounded-full bg-brand-500 mr-1.5 animate-pulse"></span>
+                <span id="aiHeaderStatusText">AI处理中</span>
+            </div>
+            <button onclick="exitDiagnosis()" class="px-2.5 py-1.5 bg-slate-700 hover:bg-red-600/80 rounded-md text-xs text-slate-300 hover:text-white transition whitespace-nowrap">
                 退出诊断
             </button>
         </div>
@@ -103,14 +131,21 @@ HTML_TEMPLATE = '''
             <div class="text-center border-r border-slate-700/50 pr-8">
                 <h2 class="font-bold mb-4 text-lg text-slate-200">数据接入</h2>
                 <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
-                <div id="dropZone" class="border-2 border-dashed border-slate-600 rounded-xl p-8 cursor-pointer hover:border-cyan-500 hover:bg-slate-700/30 transition flex flex-col items-center justify-center" onclick="document.getElementById('fileInput').click()">
+                <div id="dropZone" class="border-2 border-dashed border-slate-600 rounded-xl p-8 cursor-pointer hover:border-brand-500 hover:bg-slate-700/30 transition flex flex-col items-center justify-center" onclick="document.getElementById('fileInput').click()">
                     <svg class="w-8 h-8 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                     <p class="text-slate-300 font-medium mb-1">拖拽文件到此处，或点击选择文件</p>
                     <p class="text-xs text-slate-500">支持 .xlsx 和 .xls 格式</p>
                 </div>
-                <div id="fileName" class="mt-3 text-sm text-cyan-400 hidden"></div>
+                <div id="fileName" class="mt-3 text-sm text-brand-400 hidden"></div>
+                <div class="mt-3 flex items-center gap-2">
+                    <select id="uploadGroup" class="flex-1 bg-slate-600 border border-slate-500 rounded-md px-2.5 py-1.5 text-white text-xs focus:border-brand-500 outline-none">
+                        <option value="">-- 选择分组 --</option>
+                    </select>                    <button onclick="showGroupManager()" class="px-2.5 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition" title="管理分组">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </button>
+                </div>
                 <div id="uploadMsg" class="mt-2 text-sm text-slate-400"></div>
-                <button id="uploadBtn" onclick="uploadFile()" class="mt-4 px-6 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-bold text-sm transition disabled:opacity-50 shadow-sm" disabled>开始诊断</button>
+                <button id="uploadBtn" onclick="uploadFile()" class="mt-4 px-6 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded-lg font-bold text-sm transition disabled:opacity-50 shadow-sm" disabled>开始诊断</button>
                 <ul class="space-y-2 text-sm text-slate-400">
                     <li class="flex items-center gap-2"><svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>品牌缺失 / 品牌错误 / 品牌正确检测</li>
                     <li class="flex items-center gap-2"><svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>新品牌自动发现与确认入库</li>
@@ -119,10 +154,9 @@ HTML_TEMPLATE = '''
                     <li class="flex items-center gap-2"><svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>一键导出标准化结果</li>
                 </ul>
             </div>
-            <div class="flex flex-col justify-center pl-8">
-                <h3 class="font-bold text-slate-200 text-sm mb-4 border-b border-slate-700 pb-2">最近上传</h3>
-                
-                <div id="recentFiles" class="mt-6 space-y-2 text-sm"></div>
+            <div class="flex flex-col pl-8" style="min-height:280px;">
+                <h3 class="font-bold text-slate-200 text-sm pb-2 border-b border-slate-700 flex-shrink-0">最近上传</h3>
+                <div id="recentFiles" class="mt-3 space-y-2 text-sm overflow-y-auto flex-1" style="max-height:220px;"></div>
             </div>
         </div>
     </div>
@@ -130,12 +164,12 @@ HTML_TEMPLATE = '''
     <!-- 进度区域 -->
     <div id="progressSection" class="bg-slate-800 rounded-xl px-6 py-4 mb-6 hidden border border-slate-700/50 shadow-sm">
         <div class="flex items-center gap-4">
-            <h3 class="font-bold text-cyan-400 text-sm whitespace-nowrap">正在诊断...</h3>
+            <h3 class="font-bold text-brand-400 text-sm whitespace-nowrap">正在诊断...</h3>
             <div class="flex-1 bg-slate-700 rounded-full h-2">
-                <div id="progressBar" class="bg-cyan-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div>
+                <div id="progressBar" class="bg-brand-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div>
             </div>
             <span class="text-sm text-slate-400 whitespace-nowrap"><span id="progressPercent">0</span>%</span>
-            <span id="progressText" class="text-sm text-cyan-400 truncate"></span>
+            <span id="progressText" class="text-sm text-brand-400 truncate"></span>
         </div>
         <div id="progressSteps" class="text-[10px] text-slate-500 mt-2 text-left hidden">
             <span id="stepReading">读取文件: --</span>
@@ -158,7 +192,7 @@ HTML_TEMPLATE = '''
         <div class="bg-slate-800 rounded-xl p-4 text-center border border-slate-700/50 border-b-2 border-b-amber-500/50 shadow-sm"><div class="text-2xl font-bold text-amber-400" id="statBrandMissing">-</div><div class="text-xs text-slate-400 mt-1">品牌缺失</div></div>
         <div class="bg-slate-800 rounded-xl p-4 text-center border border-slate-700/50 border-b-2 border-b-red-500/50 shadow-sm"><div class="text-2xl font-bold text-red-400" id="statBrandMismatch">-</div><div class="text-xs text-slate-400 mt-1">品牌错误</div></div>
         <div class="bg-slate-800 rounded-xl p-4 text-center border border-slate-700/50 border-b-2 border-b-purple-500/50 shadow-sm"><div class="text-2xl font-bold text-purple-400" id="statMarketing">-</div><div class="text-xs text-slate-400 mt-1">营销分类</div></div>
-        <div class="bg-slate-800 rounded-xl p-4 text-center border border-slate-700/50 border-b-2 border-b-cyan-500/50 shadow-sm"><div class="text-2xl font-bold text-cyan-400" id="statNeedAI">-</div><div class="text-xs text-slate-400 mt-1">待AI处理</div></div>
+        <div class="bg-slate-800 rounded-xl p-4 text-center border border-slate-700/50 border-b-2 border-b-cyan-500/50 shadow-sm"><div class="text-2xl font-bold text-brand-400" id="statNeedAI">-</div><div class="text-xs text-slate-400 mt-1">待AI处理</div></div>
     </div>
 
     <!-- 诊断结果区域 -->
@@ -236,9 +270,9 @@ HTML_TEMPLATE = '''
                     </button>
                 </div>
                 <div id="cateTreeBody" class="hidden">
-                    <input type="text" id="cateTreeSearch" placeholder="搜索分类路径..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm mb-2 focus:outline-none focus:border-cyan-500" oninput="filterCategoryTree(this.value)">
-                    <input type="text" id="productSearch" placeholder="搜商品名/编码，快速定位清洗路径..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm mb-3 focus:outline-none focus:border-cyan-500" oninput="searchProduct(this.value)">
-                    <div id="productSearchResults" class="hidden mb-2 max-h-40 overflow-y-auto text-sm bg-slate-900/50 rounded p-1"></div>
+                    <input type="text" id="cateTreeSearch" placeholder="搜索分类路径..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm mb-2 focus:outline-none focus:border-brand-500" oninput="filterCategoryTree(this.value)">
+                    <input type="text" id="productSearch" placeholder="搜商品名/编码，支持空格多关键词..." class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm mb-3 focus:outline-none focus:border-brand-500" oninput="searchProduct(this.value)">
+                    <div id="productSearchResults" class="hidden mb-2 max-h-72 overflow-y-auto text-sm bg-slate-900/50 rounded p-1"></div>
                     <div id="cateTreeContainer" class="max-h-96 overflow-y-auto text-sm bg-slate-900/30 p-2 rounded"></div>
                 </div>
             </div>
@@ -286,9 +320,13 @@ HTML_TEMPLATE = '''
                     </select>
                 </div>
             </div>
-            <div class="flex gap-3 mt-6">
+            <div class="flex items-center gap-3 mt-6">
+                <label class="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+                    <input type="checkbox" id="aiForceReanalyze" class="rounded bg-slate-700 border-slate-600">
+                    强制重新分析（忽略缓存）
+                </label>
                 <button onclick="saveAIConfig()" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium text-white transition-colors border border-slate-600">保存配置</button>
-                <button onclick="startAIProcessing()" class="px-6 py-2 bg-brand-600 hover:bg-brand-500 rounded-lg text-sm font-medium text-white transition-colors shadow-sm flex items-center gap-2">
+                <button onclick="startAIProcessing()" class="px-6 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded-lg text-sm font-medium text-white transition-colors shadow-sm flex items-center gap-2">
                     交给AI处理
                 </button>
             </div>
@@ -297,7 +335,7 @@ HTML_TEMPLATE = '''
         <!-- AI 处理进度 -->
         <div id="aiProgressSection" class="bg-slate-800 rounded-xl p-6 mb-6 border border-slate-700/50 shadow-sm hidden">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="font-bold text-cyan-400 flex items-center gap-2">
+                <h3 class="font-bold text-brand-400 flex items-center gap-2">
                     <span class="flex h-3 w-3 rounded-full bg-green-500 animate-pulse" id="aiStatusDot"></span>
                     <span id="aiStatusTitle">AI 正在处理未确认的商品...</span>
                 </h3>
@@ -308,7 +346,7 @@ HTML_TEMPLATE = '''
             <div class="mb-4">
                 <div class="flex items-center gap-4 mb-2">
                     <div class="flex-1 bg-slate-700 rounded-full h-3">
-                        <div id="aiProgressBar" class="bg-cyan-500 h-3 rounded-full transition-all duration-500" style="width:0%"></div>
+                        <div id="aiProgressBar" class="bg-brand-500 h-3 rounded-full transition-all duration-500" style="width:0%"></div>
                     </div>
                     <span class="text-sm text-slate-400 whitespace-nowrap"><span id="aiProgressPercent">0</span>%</span>
                 </div>
@@ -356,7 +394,7 @@ HTML_TEMPLATE = '''
     <div id="sidePanel" class="side-panel">
         <div class="p-6">
             <div class="flex justify-between items-center mb-4">
-                <h3 id="sidePanelTitle" class="text-lg font-bold text-cyan-400">商品详情</h3>
+                <h3 id="sidePanelTitle" class="text-lg font-bold text-brand-400">商品详情</h3>
                 <button onclick="closeSidePanel()" class="text-slate-400 hover:text-white text-xl font-bold px-2">✕</button>
             </div>
             <div id="panelItemsList" class="space-y-3"></div>
@@ -376,10 +414,18 @@ HTML_TEMPLATE = '''
                         <span id="newBrandsCount" class="text-sm text-slate-400 font-normal ml-1"></span>
             <div class="flex items-center gap-1.5 flex-shrink-0">
                 <span id="newBrandsCount" class="text-xs text-slate-500"></span>
-                <button onclick="showExportPreview()" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 rounded text-xs font-medium text-white whitespace-nowrap shadow-sm">导入品牌库</button>
+                <button onclick="showExportPreview()" class="px-3 py-1.5 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded text-xs font-medium text-white whitespace-nowrap shadow-sm">导入品牌库</button>
             </div>
         </div>
-        <div id="newBrandsList" class="sidebar-list space-y-2 mt-4"></div>
+        <div class="relative mt-3">
+            <input id="newBrandsSearch" type="text" placeholder="搜索品牌名称..."
+                   oninput="updateNewBrandsDisplay()"
+                   class="w-full bg-slate-800/80 border border-slate-600/50 rounded-lg px-3 py-1.5 pl-8 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-600/60 focus:ring-1 focus:ring-brand-600/30 transition">
+            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+            </svg>
+        </div>
+        <div id="newBrandsList" class="sidebar-list space-y-2"></div>
     </div>
 
 <!-- 导出预览弹窗 -->
@@ -391,7 +437,7 @@ HTML_TEMPLATE = '''
         <div class="overflow-y-auto max-h-[40vh] mb-4 bg-slate-900 rounded-lg p-3 border border-slate-700/50" id="exportPreviewList"></div>
         <div class="flex justify-end gap-2">
             <button onclick="closeExportPreview()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm text-slate-200">取消</button>
-            <button onclick="confirmExportToLibrary()" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 rounded text-sm font-medium text-white shadow-sm">确认导出</button>
+            <button onclick="confirmExportToLibrary()" class="px-4 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded text-sm font-medium text-white shadow-sm">确认导出</button>
         </div>
     </div>
 </div>
@@ -400,11 +446,11 @@ HTML_TEMPLATE = '''
 <div id="addBrandModal" class="export-modal">
     <div class="export-modal-overlay" onclick="closeAddBrandModal()"></div>
     <div class="export-modal-content" style="width: 450px;">
-        <h3 class="text-lg font-bold text-cyan-400 mb-4">➕ 添加/编辑品牌</h3>
+        <h3 class="text-lg font-bold text-brand-400 mb-4">➕ 添加/编辑品牌</h3>
         <div class="space-y-4">
             <div>
                 <label class="block text-sm text-slate-400 mb-1">品牌名称 (必填)</label>
-                <input type="text" id="modalBrandName" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-cyan-500 outline-none" placeholder="例如: 乐事/Lay's">
+                <input type="text" id="modalBrandName" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-brand-500 outline-none" placeholder="例如: 乐事/Lay's">
             </div>
             <div>
                 <label class="block text-sm text-slate-400 mb-1">品牌类型</label>
@@ -434,16 +480,16 @@ HTML_TEMPLATE = '''
                 </div>
                 <div id="modalRelationType" class="flex gap-4 mt-1.5" style="display:none;">
                     <label class="text-sm text-slate-400 flex items-center gap-1.5 cursor-pointer" onclick="document.getElementById('relationSubBrand').checked=true">
-                        <input type="radio" name="relation" id="relationSubBrand" value="sub_brand" checked class="accent-cyan-500"> 子品牌
+                        <input type="radio" name="relation" id="relationSubBrand" value="sub_brand" checked class="accent-brand-500"> 子品牌
                     </label>
                     <label class="text-sm text-slate-400 flex items-center gap-1.5 cursor-pointer" onclick="document.getElementById('relationAlias').checked=true">
-                        <input type="radio" name="relation" id="relationAlias" value="alias" class="accent-cyan-500"> 别名
+                        <input type="radio" name="relation" id="relationAlias" value="alias" class="accent-brand-500"> 别名
                     </label>
                 </div>
             </div>
             <div class="flex gap-2 pt-2">
                 <button onclick="closeAddBrandModal()" class="flex-1 py-2 bg-slate-600 hover:bg-slate-500 rounded font-bold">取消</button>
-                <button onclick="submitNewBrandFromModal()" class="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 rounded font-bold">确认添加</button>
+                <button onclick="submitNewBrandFromModal()" class="flex-1 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded font-bold">确认添加</button>
             </div>
         </div>
     </div>
@@ -453,11 +499,11 @@ HTML_TEMPLATE = '''
 <div id="brandConfigModal" class="export-modal">
     <div class="export-modal-overlay" onclick="closeBrandConfigModal()"></div>
     <div class="export-modal-content" style="width: 500px;">
-        <h3 id="brandConfigModalTitle" class="text-lg font-bold text-cyan-400 mb-4">⚙️ 管理</h3>
+        <h3 id="brandConfigModalTitle" class="text-lg font-bold text-brand-400 mb-4">⚙️ 管理</h3>
         <div id="brandConfigList" class="max-h-60 overflow-y-auto mb-4 space-y-1 text-sm"></div>
         <div class="flex gap-2">
             <input type="text" id="brandConfigNewInput" class="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" placeholder="输入新类型名称...">
-            <button onclick="submitBrandConfigNew()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded text-sm font-bold">+ 新增</button>
+            <button onclick="submitBrandConfigNew()" class="px-4 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded text-sm font-bold">+ 新增</button>
         </div>
     </div>
 </div>
@@ -466,13 +512,13 @@ HTML_TEMPLATE = '''
 <div id="categoryPickerModal" class="export-modal">
     <div class="export-modal-overlay" onclick="closePickerModal()"></div>
     <div class="export-modal-content" style="width: 500px;">
-        <h3 class="text-lg font-bold text-cyan-400 mb-4">📂 设置分类</h3>
+        <h3 class="text-lg font-bold text-brand-400 mb-4">📂 设置分类</h3>
         <input type="text" id="pickerSearch" placeholder="搜索分类..." class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm mb-3" oninput="filterPickerTree(this.value)" autocomplete="off">
         <div id="pickerTreeContainer" class="max-h-64 overflow-y-auto border border-slate-700/50 rounded p-2 mb-3"></div>
         <div id="pickerSelectedDisplay" class="text-xs text-slate-400 mb-3 min-h-[20px]"></div>
         <div class="flex gap-2 justify-end">
             <button onclick="closePickerModal()" class="px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded text-sm">取消</button>
-            <button id="pickerConfirmBtn" onclick="confirmPickerSelection()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded text-sm font-bold" disabled>确认</button>
+            <button id="pickerConfirmBtn" onclick="confirmPickerSelection()" class="px-4 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded text-sm font-bold" disabled>确认</button>
         </div>
     </div>
 </div>
@@ -483,6 +529,9 @@ HTML_TEMPLATE = '''
 <script src="/static/js/brand_editor.js"></script>
 <script src="/static/js/export.js"></script>
 <script src="/static/js/ai_process.js"></script>
+
+
+
 </body>
 </html>
 '''
@@ -493,22 +542,104 @@ REVIEW_TEMPLATE = '''
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8">
-    <title>人工复核 - 商品数据清理系统 V4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>人工复核 - 商品数据清理系统</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .status-pending { background: #f59e0b; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .status-confirmed { background: #16a34a; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .status-modified { background: #3b82f6; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .tag-self { background: #8b5cf6; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+        .tag-import { background: #ef4444; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+        .tag-domestic { background: #22c55e; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+        .tag-promo { background: #f97316; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+        .tag-recommend { background: #eab308; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+        .card-active { border-color: #06b6d4 !important; background: rgba(6,182,212,0.08) !important; }
+        .detail-panel { position: fixed; top: 0; right: -520px; width: 520px; height: 100vh; background: #1e293b; transition: right 0.3s ease; z-index: 1000; overflow-y: auto; box-shadow: -4px 0 20px rgba(0,0,0,0.5); }
+        .detail-panel.open { right: 0; }
+        .detail-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
+        .detail-overlay.open { display: block; }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen text-white">
-<div class="max-w-5xl mx-auto px-6 py-8">
-    <div class="text-center mb-6">
-        <h1 class="text-2xl font-bold">人工复核界面</h1>
-        <p class="text-slate-400 text-sm">自动监听处理进度，增量加载待复核数据</p>
+<div id="review-app" class="flex flex-col h-screen">
+    <!-- 顶栏 -->
+    <header class="bg-slate-800/80 border-b border-slate-700 px-6 py-3 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-4">
+            <h1 class="text-lg font-bold text-brand-400">人工复核</h1>
+            <span id="sessionBadge" class="text-slate-400 text-xs bg-slate-700 px-2 py-1 rounded">--</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <span id="progressText" class="text-slate-400 text-sm">--</span>
+            <div class="w-24 bg-slate-700 rounded-full h-2">
+                <div id="progressBar" class="bg-brand-500 h-2 rounded-full" style="width:0"></div>
+            </div>
+            <button onclick="exportCustom()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-sm">导出当前筛选</button>
+            <button onclick="exportCustom(null)" class="px-3 py-1.5 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded text-sm font-bold">导出全部</button>
+        </div>
+    </header>
+
+    <!-- 筛选栏 -->
+    <div class="bg-slate-800/50 border-b border-slate-700/50 px-6 py-2 flex items-center gap-3 shrink-0">
+        <div id="statusFilters" class="flex gap-1">
+            <button data-status="all" class="filter-btn px-3 py-1 rounded text-xs bg-gradient-to-br from-brand-500 to-brand-700 text-white">全部</button>
+            <button data-status="待复核" class="filter-btn px-3 py-1 rounded text-xs bg-slate-700 text-slate-300">待复核</button>
+            <button data-status="已确认" class="filter-btn px-3 py-1 rounded text-xs bg-slate-700 text-slate-300">已确认</button>
+            <button data-status="已修改" class="filter-btn px-3 py-1 rounded text-xs bg-slate-700 text-slate-300">已修改</button>
+        </div>
+        <div class="w-px h-5 bg-slate-600"></div>
+        <select id="selfOpFilter" onchange="applyFilters()" class="bg-slate-700 text-slate-300 text-xs rounded px-2 py-1 border border-slate-600">
+            <option value="">自营: 全部</option>
+            <option value="自营">自营</option>
+        </select>
+        <select id="importFilter" onchange="applyFilters()" class="bg-slate-700 text-slate-300 text-xs rounded px-2 py-1 border border-slate-600">
+            <option value="">进口/国产: 全部</option>
+            <option value="进口">进口</option>
+            <option value="国产">国产</option>
+        </select>
+        <div class="flex-1"></div>
+        <input id="searchInput" type="text" placeholder="搜索商品名或编码..." oninput="applyFilters()"
+            class="bg-slate-700 text-slate-200 text-sm rounded px-3 py-1 border border-slate-600 w-56 focus:outline-none focus:border-brand-500">
     </div>
-    <div class="bg-slate-800/50 rounded-xl p-6 mb-6">
-        <h3 class="font-bold">待复核列表</h3>
-        <div id="loadingMsg" class="text-center text-slate-400 py-8">
-            <div class="animate-pulse">正在监听处理进度...</div>
+
+    <!-- 主内容区 -->
+    <div class="flex flex-1 overflow-hidden">
+        <div class="flex-1 overflow-y-auto px-6 py-4">
+            <div id="loadingMsg" class="text-center text-slate-400 py-16">
+                <div class="animate-pulse text-lg">正在加载复核数据...</div>
+                <p class="text-sm mt-2">若处理尚未完成，数据将自动刷新</p>
+            </div>
+            <div id="reviewList" class="space-y-2 hidden"></div>
+            <div id="emptyMsg" class="text-center text-slate-500 py-16 hidden">
+                <p class="text-lg">没有符合条件的数据</p>
+            </div>
+            <div id="pagination" class="flex items-center justify-center gap-2 mt-6 hidden"></div>
+        </div>
+        <div id="detailPlaceholder" class="w-[420px] shrink-0 border-l border-slate-700/50 bg-slate-800/30 p-6 overflow-y-auto hidden">
+            <div class="text-center text-slate-500 mt-20">
+                <p class="text-4xl mb-2">&larr;</p>
+                <p>点击左侧商品查看详情</p>
+            </div>
         </div>
     </div>
 </div>
+
+<div id="detailOverlay" class="detail-overlay" onclick="closeDetail()"></div>
+<div id="detailPanel" class="detail-panel">
+    <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold text-brand-400">商品详情</h2>
+            <button onclick="closeDetail()" class="text-slate-400 hover:text-white text-xl">&times;</button>
+        </div>
+        <div id="detailContent"></div>
+    </div>
+</div>
+
+<script src="/static/js/common.js"></script>
+<script src="/static/js/review.js"></script>
+
+
+
 </body>
 </html>
 '''

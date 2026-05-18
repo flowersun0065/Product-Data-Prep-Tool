@@ -363,33 +363,66 @@ function filterCategoryTree(text) {
     });
 }
 
-// 按商品名/编码搜索清洗路径
+// 按商品名/编码搜索清洗路径（支持连续子串 + 关键词AND两种模式同时匹配，分页展示全部结果）
 function searchProduct(query) {
     const container = document.getElementById('productSearchResults');
     if (!container) return;
-    const lower = (query || '').trim().toLowerCase();
-    if (!lower || lower.length < 2) {
+    const raw = (query || '').trim();
+    if (!raw || raw.length < 2) {
         container.classList.add('hidden');
+        container._searchMatches = null;
         return;
     }
+    const lower = raw.toLowerCase();
+    const keywords = lower.split(/\s+/).filter(k => k.length > 0);
     const codes = window.diagnosisData?.all_codes || [];
+    const seen = new Set();
     const matches = [];
+    function addMatch(item) {
+        const key = item.code || item.name || '';
+        if (seen.has(key)) return;
+        seen.add(key);
+        matches.push(item);
+    }
     for (const item of codes) {
         const name = (item.name || '').toLowerCase();
         const code = (item.code || '').toLowerCase();
+        // 模式一：全串模糊匹配（原有行为）
         if (name.includes(lower) || code.includes(lower)) {
-            matches.push(item);
-            if (matches.length >= 50) break;
+            addMatch(item);
+            continue;
+        }
+        // 模式二：关键词 AND 匹配（空格分词，需包含所有关键词）
+        if (keywords.length > 1) {
+            const allMatch = keywords.every(kw => name.includes(kw) || code.includes(kw));
+            if (allMatch) addMatch(item);
         }
     }
     if (matches.length === 0) {
         container.innerHTML = '<div class="text-slate-500 text-xs px-2 py-1">未找到匹配商品</div>';
         container.classList.remove('hidden');
+        container._searchMatches = null;
         return;
     }
-    const path = matches[0].suggested_path?.[0] || '';
-    const pathDisplay = path || '<span class="text-slate-500">暂无清洗路径</span>';
-    const html = matches.map(item => {
+    // 保存全部匹配结果，初始化分页
+    container._searchMatches = matches;
+    container._searchPage = 0;
+    renderSearchPage(container);
+    container.classList.remove('hidden');
+}
+
+const SEARCH_PAGE_SIZE = 50;
+
+function renderSearchPage(container) {
+    const matches = container._searchMatches || [];
+    const page = container._searchPage || 0;
+    const total = matches.length;
+    const start = 0;
+    const end = Math.min((page + 1) * SEARCH_PAGE_SIZE, total);
+    const pageItems = matches.slice(start, end);
+    const hasMore = end < total;
+
+    const itemsHtml = pageItems.map(item => {
         const p = item.suggested_path?.[0] || '';
         const safePath = p.replace(/'/g, "\\'");
         return `<div class="flex items-center gap-2 px-2 py-1.5 hover:bg-cyan-700/30 rounded cursor-pointer border-b border-slate-700/50 last:border-0"
@@ -399,8 +432,25 @@ function searchProduct(query) {
                     ${p ? `<span class="text-[10px] text-cyan-400 truncate max-w-[200px]">→ ${p}</span>` : '<span class="text-[10px] text-slate-500">→ 暂无路径</span>'}
                 </div>`;
     }).join('');
-    container.innerHTML = html;
-    container.classList.remove('hidden');
+
+    const countBar = `<div class="flex items-center justify-between px-2 py-1 text-[10px] text-slate-500 border-b border-slate-700/50">
+        <span>共 ${total} 个匹配</span>
+        <span>已显示 ${end} 个</span>
+    </div>`;
+
+    const moreBtn = hasMore
+        ? `<button class="w-full text-xs text-cyan-400 py-1.5 hover:bg-cyan-700/20 rounded"
+                   onclick="loadMoreSearchResults(this)">加载更多（${total - end} 条）</button>`
+        : '';
+
+    container.innerHTML = countBar + itemsHtml + moreBtn;
+}
+
+function loadMoreSearchResults(btn) {
+    const container = document.getElementById('productSearchResults');
+    if (!container) return;
+    container._searchPage = (container._searchPage || 0) + 1;
+    renderSearchPage(container);
 }
 
 function toggleMarketingInTree() {
@@ -535,7 +585,7 @@ function renderMissingItems(items) {
             }
             if (factors.brand_type) parts.push(`type="${factors.brand_type}"`);
             if (factors.modifier_detail && factors.modifier_detail.length) {
-                const modStr = factors.modifier_detail.map(m => `${m.value}[${m.type}]`).join(',');
+                const modStr = factors.modifier_detail.map(m => `${m.value}[${m.type || '未知'}]`).join(',');
                 parts.push(`修饰词=${modStr}`);
             } else if (factors.modifiers?.length) {
                 parts.push(`修饰词=${factors.modifiers.join(',')}`);
@@ -854,7 +904,7 @@ function renderCategoryPanelContent() {
             }
             if (factors.brand_type) parts.push(`type="${factors.brand_type}"`);
             if (factors.modifier_detail && factors.modifier_detail.length) {
-                const modStr = factors.modifier_detail.map(m => `${m.value}[${m.type}]`).join(',');
+                const modStr = factors.modifier_detail.map(m => `${m.value}[${m.type || '未知'}]`).join(',');
                 parts.push(`修饰词=${modStr}`);
             } else if (factors.modifiers?.length) {
                 parts.push(`修饰词=${factors.modifiers.join(',')}`);

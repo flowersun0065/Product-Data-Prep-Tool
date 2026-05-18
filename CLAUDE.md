@@ -19,26 +19,29 @@ A product data cleaning and standardization tool for grocery/supermarket product
 ```
 product_cleaner/
   constants.py         # Base paths, regex patterns, AI config thresholds
-  web/app.py           # Flask server (~2100 lines): routes, session mgmt, file upload, async AI processing
+  web/app.py           # Flask server: routes, session mgmt, file upload, group mgmt, async AI processing
   core/
-    product_parser.py  # Low-level text extraction: spec extraction (weight+pack split), entity recognition, brand/noise stripping, classify_word() lookup
+    product_parser.py  # Low-level text extraction: spec extraction, entity recognition, brand/noise stripping
     brand_checker.py   # Brand consistency: 3-tier extraction + confidence scoring
     brand_cluster.py   # Brand clustering: groups similar brand names, identifies missing/mismatched
-    category_detector.py  # Category analysis: marketing detection, conflict resolution, suggestion engine (uses SpecExtractor, classify_word, CATEGORY_GROUP_CN)
+    category_detector.py  # Category analysis: marketing detection, conflict resolution, suggestion engine
     ai_engine.py       # AI provider abstraction (Gemini/Claude/OpenAI/DeepSeek) for brand+category completion
+    tag_computer.py    # Tag computation: promo/recommend/self-operated/import tags from original data + brand DB
     standardization.py # Applies brand/category editing rules to DataFrames
-    cache.py           # JSON-file based cache for AI results, review decisions, rules
-    lexicon.py         # ~570 lines: NOT_BRAND_CATEGORIES, SPEC_UNITS, WEIGHT_UNITS, PACK_UNITS, CATEGORY_GROUP_CN, dual-meaning brands
+    cache.py           # Per-group cache: AI results, review decisions, rules (all group-isolated)
+    lexicon.py         # ~570 lines: data constants for product parsing, brands, categories
   brands/
     database.py        # Brand database V6 (~2000 lines): BRAND_DATABASE_V6 dict + dynamic persistence
     patterns.py        # Slash brand pattern matching (e.g. "Lay's/乐事")
   categories/
-    path_cleaner.py    # Category path cleaning algorithm (marketing removal, hierarchy merging, convergence)
+    path_cleaner.py    # Category path cleaning algorithm (marketing removal, hierarchy merging)
     classified_paths.py # Persistence for user-labeled marketing/standard path flags
     marketing_keywords.py # Keywords used to detect marketing-oriented categories
   templates/
-    html_templates.py  # All HTML/CSS/JS inline (~12K lines, single file)
-  static/js/           # Frontend JS modules: upload, diagnosis, brand_editor, ai_process, export
+    html_templates.py  # All HTML/CSS/JS inline (main page + review page)
+  static/js/           # Frontend JS: upload, diagnosis, brand_editor, ai_process, export, review
+  corrections/         # Per-group code-level correction records
+  cache/               # Group-scoped caches + groups.json
 ```
 
 ## Architecture
@@ -48,15 +51,22 @@ product_cleaner/
 - **Session-based async processing**: Each upload creates a session with async diagnosis (brand clustering + category analysis) and optional async AI batch processing (with cancellation support)
 - **Brand processing pipeline**: (1) Brand column check → (2) BrandConsistencyChecker.check() for validity → (3) BrandClusterEngine.cluster() for grouping → (4) AI or local extraction for missing brands
 - **Category processing pipeline**: (1) Raw paths collected per product code → (2) path_cleaner removes marketing paths, merges variants → (3) Cleaned paths used as suggestions → (4) Missing items get entity-based recommendation
-- **Persistence model**: Session snapshots (`session_snapshots.json`), brand correction history (`corrected_products.json`), AI cache (`ai_cache_v4.json`), dismissed brands, all stored as JSON files in `cache/` or alongside code
+- **Three-tier data isolation**: (1) 品牌库级 — brand DB, corrections/brands, corrections/categories, dismissed_brands, classified_paths 全局共享 (2) 组级 — corrected_products, AI cache, rules cache, review cache, session snapshots 按 group_id 隔离 (3) 文件级 — 上传的 Excel、结果 Excel 按 session 隔离
+- **Group management**: 上传时必须选分组 (`cache/groups.json`)。同组内不同文件的 code 级确认和 AI 结果共享，不同组完全隔离。分组数据可维护（新建/删除/重命名）。
+- **Persistence model**: Session snapshots (`cache/session_snapshots/{group_id}/{file_hash}.json`), code corrections (`corrections/{group_id}/corrected_products.json`), AI cache (`cache/ai_cache/{group_id}/{file_hash}.json`), review cache (`cache/review_cache/{group_id}/review.json`), rules cache (`cache/rules_cache/{group_id}/rules.json`), brand library data (`brands/*.json`)
+- **AI cache**: Cache key = `ai:{code}:{provider}:{model_id}`, per-file per-group. Switching models auto-invalidates. User can force re-analyze via checkbox. Cached results skip AI on re-run.
 
 ## Key Patterns
 
 - `StandardizationEngine.apply_rules()` mutates DataFrames in place using brand/category rules dicts
-- `CacheManager` uses atomic write (`write tmp → os.replace`) for thread safety
+- `CacheManager` uses atomic write (`write tmp → os.replace`) for thread safety. All methods accept `group_id` as first parameter for group-level isolation
 - `diagnose_async()` and `process_file_async()` run in background threads with session-level locks
+- `_build_result_entry()` is the single helper for constructing AI result entries (used by AI/local/skipped branches)
+- `_get_group_id(session_id)` extracts group_id from session for passing to cache/database functions
+- `_serialize_session()` only persists file-level data; brand-library data (new_brands, confirmed_brands) lives globally
 - `infer_brand_metadata()` uses heuristic country/type detection for new brand candidates
 - `build_entity_dict()` identifies product entity words by analyzing name suffixes across all products
+- `compute_all_tags()` in `tag_computer.py` computes promo/recommend/self-operated/import tags from raw data + brand DB
 
 ## Rules
 

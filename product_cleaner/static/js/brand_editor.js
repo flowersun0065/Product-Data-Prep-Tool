@@ -1431,7 +1431,34 @@ function updateNewBrandsDisplay() {
 
     if (sidebar) sidebar.classList.remove('hidden');
     if (app) app.style.paddingRight = '380px';
-    list.innerHTML = newBrands.map((brand, index) => {
+
+    // 搜索过滤
+    const searchInput = document.getElementById('newBrandsSearch');
+    const searchTerm = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const filteredBrands = searchTerm
+        ? newBrands.filter(b =>
+            (b.name || '').toLowerCase().includes(searchTerm) ||
+            (b.suggested_name || '').toLowerCase().includes(searchTerm) ||
+            (b.sample_product || '').toLowerCase().includes(searchTerm) ||
+            (b.sample_category || '').toLowerCase().includes(searchTerm)
+          )
+        : newBrands;
+
+    // 更新计数: 搜索时显示"X/Y"
+    const total = newBrands.length;
+    const shown = filteredBrands.length;
+    if (countEl) {
+        countEl.textContent = searchTerm ? `(${shown}/${total})` : `(${total})`;
+    }
+
+    if (filteredBrands.length === 0 && searchTerm) {
+        list.innerHTML = `<div class="text-[11px] text-slate-500 text-center py-8">未找到匹配 "${searchTerm}" 的品牌</div>`;
+        return;
+    }
+
+    list.innerHTML = filteredBrands.map((brand, rawIndex) => {
+        // 原始索引，供回调使用
+        const index = newBrands.indexOf(brand);
         // 安全处理字符串
         const safeName = (brand.name || '').replace(/'/g, "\\'");
         const safeSuggestedName = (brand.suggested_name || '').replace(/'/g, "\\'");

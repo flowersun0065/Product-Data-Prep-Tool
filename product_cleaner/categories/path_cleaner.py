@@ -570,8 +570,16 @@ def clean_paths(code_paths: dict) -> dict:
             kept = False
             for j in range(i):
                 l3_b = sorted_l3s[j][0]
-                if (l3_a == l3_b or token_set(l3_a) & token_set(l3_b)
-                        or l3_a in l3_b or l3_b in l3_a):
+                merge = (l3_a == l3_b or bool(token_set(l3_a) & token_set(l3_b)))
+                if not merge and (l3_a in l3_b or l3_b in l3_a):
+                    try:
+                        from ..core.embedding_matcher import is_l3_related
+                        merge = is_l3_related(l3_a, l3_b)
+                    except ImportError:
+                        merge = True
+                    except (OSError, ValueError, RuntimeError):
+                        merge = True
+                if merge:
                     l3_dedup[l3_a] = l3_b
                     kept = True
                     break
@@ -579,5 +587,15 @@ def clean_paths(code_paths: dict) -> dict:
                 l3_dedup[l3_a] = l3_a
         for l3, codes in l3_groups.items():
             final_paths[f'{cluster_key} > {l3_dedup[l3]}'].extend(codes)
-    
-    return final_paths
+
+    # 后处理: 折叠 L2==L1 的冗余路径，L3 补位 L2 保持 3 级格式
+    # "蔬菜豆制品 > 蔬菜豆制品 > 叶菜/花菜" → "蔬菜豆制品 > 叶菜/花菜 > 叶菜/花菜"
+    collapsed = defaultdict(list)
+    for path, codes in final_paths.items():
+        parts = path.split(' > ')
+        if len(parts) == 3 and parts[0] == parts[1]:
+            collapsed[f'{parts[0]} > {parts[2]} > {parts[2]}'].extend(codes)
+        else:
+            collapsed[path].extend(codes)
+
+    return collapsed

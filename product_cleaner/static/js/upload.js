@@ -21,6 +21,7 @@
             
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('group_id', document.getElementById('uploadGroup').value || '');
             
             // 清除 input 值，允许再次选择同一文件进行测试
             fileInput.value = '';
@@ -64,6 +65,108 @@
     }
 })();
 
+// ===== 分组管理 =====
+
+async function loadGroups() {
+    try {
+        const res = await fetch('/api/groups');
+        const data = await res.json();
+        const sel = document.getElementById('uploadGroup');
+        if (!sel) return;
+        const currentVal = sel.value;
+        sel.innerHTML = '<option value="">-- 选择分组 --</option>';
+        const groups = data.groups || {};
+        for (const [id, g] of Object.entries(groups)) {
+            sel.innerHTML += '<option value="' + id + '">' + escHtml(g.name) + '</option>';
+        }
+        sel.value = currentVal;
+        // 保存到 localStorage
+        if (currentVal) localStorage.setItem('last_group_id', currentVal);
+        return groups;
+    } catch (e) {
+        console.error('loadGroups error:', e);
+    }
+}
+
+async function showGroupManager() {
+    const groups = await loadGroups();
+    let html = '<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onclick="this.remove()">';
+    html += '<div class="bg-slate-800 rounded-xl p-6 w-96 max-h-[80vh] overflow-y-auto" onclick="event.stopPropagation()">';
+    html += '<h3 class="font-bold text-lg mb-4">分组管理</h3>';
+    html += '<div class="space-y-2 mb-4">';
+    for (const [id, g] of Object.entries(groups || {})) {
+        html += '<div class="flex items-center justify-between bg-slate-700 rounded px-3 py-2 text-sm">';
+        html += '<span>' + escHtml(g.name) + '</span>';
+        html += '<button onclick="deleteGroup(\'' + id + '\')" class="text-red-400 hover:text-red-300 text-xs">删除</button>';
+        html += '</div>';
+    }
+    html += '</div>';
+    html += '<div class="flex gap-2">';
+    html += '<input id="newGroupName" class="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm" placeholder="新分组名称">';
+    html += '<button onclick="createGroup()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded text-sm font-bold">新建</button>';
+    html += '</div>';
+    html += '</div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
+async function createGroup() {
+    const name = document.getElementById('newGroupName').value.trim();
+    if (!name) return alert('请输入名称');
+    try {
+        const res = await fetch('/api/groups', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name})
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.querySelector('.fixed.inset-0.z-50')?.remove();
+            await loadGroups();
+            document.getElementById('uploadGroup').value = data.group_id;
+        }
+    } catch (e) {
+        alert('创建失败: ' + e.message);
+    }
+}
+
+async function deleteGroup(id) {
+    if (!confirm('确定删除此分组？该操作不可撤销。')) return;
+    try {
+        await fetch('/api/groups/' + id, {method: 'DELETE'});
+        document.querySelector('.fixed.inset-0.z-50')?.remove();
+        await loadGroups();
+    } catch (e) {
+        alert('删除失败: ' + e.message);
+    }
+}
+
+function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// 页面加载时初始化分组
+loadGroups().then(() => {
+    const lastGroup = localStorage.getItem('last_group_id');
+    if (lastGroup) document.getElementById('uploadGroup').value = lastGroup;
+});
+
+// 文件选择后启用上传按钮，未选分组不允许上传
+(function() {
+    const fi = document.getElementById('fileInput');
+    const btn = document.getElementById('uploadBtn');
+    if (fi && btn) {
+        const origOnChange = fi.onchange;
+        fi.addEventListener('change', function() {
+            const group = document.getElementById('uploadGroup').value;
+            btn.disabled = !fi.files[0] || !group;
+        });
+        document.getElementById('uploadGroup')?.addEventListener('change', function() {
+            btn.disabled = !fi.files[0] || !this.value;
+        });
+    }
+})();
+
 // 加载最近文件列表
 async function loadRecentFiles() {
     const container = document.getElementById('recentFiles');
@@ -79,12 +182,12 @@ async function loadRecentFiles() {
         }
 
         container.innerHTML = files.map(f => `
-            <div onclick="importRecentFile('${f.id}')" 
+            <div onclick="importRecentFile('${f.id}')"
                  class="bg-slate-900/50 hover:bg-slate-700/50 border border-slate-700 p-3 rounded-lg cursor-pointer transition-all group">
                 <div class="flex justify-between items-center">
                     <div class="flex flex-col truncate">
                         <span class="text-slate-200 text-sm font-medium group-hover:text-cyan-400 truncate">${f.name}</span>
-                        <span class="text-[10px] text-slate-500">${f.time}</span>
+                        <span class="text-[10px] text-slate-500">${f.time}${f.group_name ? ' · ' + escHtml(f.group_name) : ''}</span>
                     </div>
                     <span class="text-xs text-cyan-600 font-bold group-hover:text-cyan-400">导入 →</span>
                 </div>
@@ -106,7 +209,7 @@ async function importRecentFile(fileId) {
         const res = await fetch('/api/import_recent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ file_id: fileId })
+            body: JSON.stringify({ file_id: fileId, group_id: document.getElementById('uploadGroup').value || '' })
         });
         
         const data = await res.json();
