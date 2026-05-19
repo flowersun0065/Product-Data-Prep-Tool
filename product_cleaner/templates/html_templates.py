@@ -82,9 +82,90 @@ HTML_TEMPLATE = '''
         select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; padding-right: 30px !important; cursor: pointer; }
         select::-ms-expand { display: none; }
         select optgroup, select option { background: #1e293b; color: #e2e8f0; }
+
+        /* ═══ Electron 侧边栏样式 ═══ */
+        .electron-sidebar {
+            position: fixed; top: 0; left: 0; bottom: 0; width: 220px;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255,255,255,0.06);
+            z-index: 60; display: flex; flex-direction: column;
+            font-family: -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+        }
+        .electron-sidebar-group { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .electron-sidebar-nav { flex: 1; overflow-y: auto; padding: 8px; }
+        .electron-sidebar-section-title {
+            color: #86868b; font-size: 9px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.5px; margin: 14px 4px 6px;
+        }
+        .electron-sidebar-item {
+            display: flex; align-items: center; gap: 6px; padding: 7px 8px;
+            border-radius: 5px; color: #98989d; font-size: 11px; cursor: pointer;
+            transition: background 0.1s;
+        }
+        .electron-sidebar-item:hover { background: rgba(255,255,255,0.04); }
+        .electron-sidebar-item.active { background: rgba(0,122,255,0.15); color: #fff; font-weight: 500; }
+        .electron-sidebar-footer {
+            padding: 8px; border-top: 1px solid rgba(255,255,255,0.06);
+            font-size: 10px; color: #98989d; cursor: pointer;
+        }
+        .electron-main-content { margin-left: 0; transition: margin-left 0.2s; }
+        .electron-main-content.electron-shifted { margin-left: 220px; }
+
+        /* 详情面板 */
+        .electron-detail-panel {
+            position: fixed; top: 0; right: -380px; width: 360px; height: 100vh;
+            background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(255,255,255,0.06);
+            padding: 16px; overflow-y: auto; z-index: 100;
+            transition: right 0.25s ease;
+        }
+        .electron-detail-panel.open { right: 0; }
+        .electron-detail-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99;
+            display: none;
+        }
+        .electron-detail-overlay.open { display: block; }
+
+        .electron-btn {
+            padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600;
+            border: none; cursor: pointer; font-family: inherit;
+        }
+        .electron-btn.primary { background: #007aff; color: #fff; }
     </style>
 </head>
 <body class="bg-slate-900 min-h-screen text-white antialiased">
+
+<!-- ═══ Electron 侧边栏 ═══ -->
+<div id="electronSidebar" class="electron-sidebar" style="display:none;">
+  <div class="electron-sidebar-group">
+    <select id="electronGroupSelect" onchange="electronSwitchGroup(this.value)" class="w-full px-3 py-2 rounded-lg text-sm font-medium"
+      style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:#f5f5f7;outline:none;">
+      <option value="">-- 选择分组 --</option>
+    </select>
+  </div>
+  <div class="electron-sidebar-nav" id="electronSidebarNav">
+    <div class="electron-sidebar-section-title">当前会话</div>
+    <div id="electronSessionSteps"></div>
+
+    <div class="electron-sidebar-section-title">品牌库</div>
+    <div class="electron-sidebar-item" data-nav="brand-database" onclick="electronNavTo('brand-database')">📋 品牌数据库</div>
+    <div class="electron-sidebar-item" data-nav="brand-corrections" onclick="electronNavTo('brand-corrections')">✏️ 品牌修正</div>
+    <div class="electron-sidebar-item" data-nav="brand-relationships" onclick="electronNavTo('brand-relationships')">🔗 品牌关系</div>
+
+    <div class="electron-sidebar-section-title">分类体系</div>
+    <div class="electron-sidebar-item" data-nav="category-tree" onclick="electronNavTo('category-tree')">🌳 分类路径树</div>
+    <div class="electron-sidebar-item" data-nav="category-classify" onclick="electronNavTo('category-classify')">🏷 路径分类标记</div>
+
+    <div class="electron-sidebar-section-title">历史会话</div>
+    <div id="electronHistory"></div>
+  </div>
+  <div class="electron-sidebar-footer" onclick="electronOpenSettings()">⚙ 设置</div>
+</div>
+
+<!-- ═══ 主内容区（现有页面原样保留） ═══ -->
+<div id="electronMainContent" class="electron-main-content">
 
 <!-- 顶部导航栏 -->
 <header class="bg-slate-800/95 border-b border-slate-700/40 sticky top-0 z-50 h-14">
@@ -531,6 +612,210 @@ HTML_TEMPLATE = '''
 <script src="/static/js/ai_process.js"></script>
 
 
+
+</div><!-- /electronMainContent -->
+
+<!-- ═══ 商品详情侧边窗 ═══ -->
+<div id="electronDetailOverlay" class="electron-detail-overlay" onclick="electronCloseDetail()"></div>
+<div id="electronDetailPanel" class="electron-detail-panel">
+  <div id="electronDetailContent"></div>
+</div>
+
+<script>
+// ═══ Electron 侧边栏逻辑 ═══
+(function(){
+  var isElectron = (window.electronAPI !== undefined) || (window.location.pathname === '/electron');
+  if (!isElectron) return;
+
+  var sidebar = document.getElementById('electronSidebar');
+  var mainContent = document.getElementById('electronMainContent');
+  if (sidebar) sidebar.style.display = '';
+  if (mainContent) mainContent.classList.add('electron-shifted');
+
+  // 步骤定义
+  var steps = [
+    {id:'upload', label:'1 上传 & 诊断'},
+    {id:'brand-review', label:'2 品牌审核'},
+    {id:'ai-process', label:'3 AI 处理'},
+    {id:'review', label:'4 复核'},
+    {id:'export', label:'5 导出'},
+  ];
+  var currentStep = 'upload';
+
+  function renderSteps() {
+    var el = document.getElementById('electronSessionSteps');
+    if (!el) return;
+    el.innerHTML = steps.map(function(s){
+      var cls = 'electron-sidebar-item';
+      if (s.id === currentStep) cls += ' active';
+      return '<div class="'+cls+'" onclick="electronSwitchStep(\''+s.id+'\')">'+s.label+'</div>';
+    }).join('');
+  }
+
+  window.electronSwitchStep = function(stepId) {
+    currentStep = stepId;
+    renderSteps();
+    // 显示对应 content section
+    var sections = {
+      'upload': ['uploadSection'],
+      'brand-review': ['diagnosisSection'],
+      'ai-process': ['progressSection'],
+      'review': ['diagnosisSection'],
+      'export': ['diagnosisSection'],
+    };
+    // 隐藏所有
+    ['uploadSection','diagnosisSection','progressSection'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el && sections[stepId] && sections[stepId].indexOf(id) !== -1) {
+        el.classList.remove('hidden');
+      }
+    });
+    // 诊断页本就会显示 upload + diagnosis
+    if (stepId === 'upload') {
+      var us = document.getElementById('uploadSection');
+      var ds = document.getElementById('diagnosisSection');
+      if (us) us.classList.remove('hidden');
+      if (ds) ds.classList.add('hidden');
+    }
+  };
+
+  window.electronSwitchGroup = function(gid) {
+    localStorage.setItem('last_group_id', gid);
+    var ug = document.getElementById('uploadGroup');
+    if (ug) ug.value = gid;
+    loadElectronHistory();
+  };
+
+  function loadElectronGroups() {
+    fetch('/api/groups').then(function(r){return r.json()}).then(function(d){
+      var sel = document.getElementById('electronGroupSelect');
+      if (!sel) return;
+      var cur = sel.value;
+      sel.innerHTML = '<option value="">-- 选择分组 --</option>';
+      Object.entries(d.groups||{}).forEach(function(e){
+        sel.innerHTML += '<option value="'+e[0]+'">📁 '+escHtml(e[1].name)+'</option>';
+      });
+      sel.value = cur || localStorage.getItem('last_group_id') || '';
+    }).catch(function(){});
+  }
+
+  function loadElectronHistory() {
+    var el = document.getElementById('electronHistory');
+    if (!el) return;
+    fetch('/api/recent_files').then(function(r){return r.json()}).then(function(files){
+      el.innerHTML = (files||[]).slice(0,5).map(function(f){
+        return '<div class="electron-sidebar-item" style="font-size:10px" onclick="importRecentFile(\''+f.id+'\')">'+
+          (f.time||'').split(' ')[0]+' · '+(f.name||'').substring(0,20)+'</div>';
+      }).join('');
+    }).catch(function(){});
+  }
+
+  window.electronNavTo = function(page) {
+    if (page === 'brand-database') { renderBrandDatabasePage(); }
+    else if (page === 'category-tree') { renderCategoryTreePage(); }
+  };
+
+  window.electronOpenSettings = function() {
+    if (window.electronAPI) { window.electronAPI.openSettings(); }
+  };
+
+  // 详情面板
+  window.electronOpenDetail = function(item) {
+    var panel = document.getElementById('electronDetailPanel');
+    var overlay = document.getElementById('electronDetailOverlay');
+    if (!panel || !overlay) return;
+    renderElectronDetail(item);
+    panel.classList.add('open');
+    overlay.classList.add('open');
+  };
+  window.electronCloseDetail = function() {
+    var panel = document.getElementById('electronDetailPanel');
+    var overlay = document.getElementById('electronDetailOverlay');
+    if (panel) panel.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
+  };
+
+  function renderElectronDetail(item) {
+    var el = document.getElementById('electronDetailContent');
+    if (!el) return;
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'+
+      '<span style="font-weight:600;">商品详情</span>'+
+      '<button onclick="electronCloseDetail()" style="background:none;border:none;color:#86868b;cursor:pointer;font-size:16px;">✕</button></div>';
+    if (item.org_image_url) html += '<div style="background:rgba(255,255,255,0.03);border-radius:8px;height:100px;display:flex;align-items:center;justify-content:center;margin-bottom:10px;"><img src="'+escAttr(item.org_image_url)+'" style="max-width:100%;max-height:100%;object-fit:contain;" onerror="this.style.display=\'none\'"></div>';
+    html += '<div style="margin-bottom:10px;"><div style="color:#86868b;font-size:10px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">基本信息</div>';
+    [['商品名',item.name],['编码',item.code],['原始品牌',item.original_brand||item.brand],['原始分类',item.original_category||item.category]].forEach(function(r){
+      if (!r[1]) return;
+      html += '<div style="display:flex;justify-content:space-between;font-size:11px;line-height:2;"><span style="color:#6e6e73;">'+esc(r[0])+'</span><span>'+esc(String(r[1]))+'</span></div>';
+    });
+    html += '</div>';
+    if (item.brand_ai) {
+      html += '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:8px;">';
+      html += '<div style="color:#86868b;font-size:10px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">品牌</div>';
+      html += '<span style="font-weight:500;">'+esc(item.brand_ai)+'</span> ';
+      html += '<span style="font-size:10px;color:#98989d;">置信度 '+item.brand_confidence+' · '+esc(item.brand_type||'')+'</span>';
+      html += '</div>';
+    }
+    if (item.category_ai) {
+      html += '<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px;margin-bottom:8px;">';
+      html += '<div style="color:#86868b;font-size:10px;font-weight:600;text-transform:uppercase;margin-bottom:4px;">分类</div>';
+      html += '<span>'+esc(item.category_ai)+'</span>';
+      html += '</div>';
+    }
+    html += '<div style="display:flex;gap:8px;margin-top:12px;">';
+    html += '<button class="electron-btn primary" onclick="electronCloseDetail()">关闭</button>';
+    html += '</div>';
+    el.innerHTML = html;
+  }
+
+  function escHtml(s) { if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function escAttr(s) { if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+  function esc(s) { return escHtml(s); }
+
+  // 品牌库和分类树页面渲染（简化版本，在侧边栏面板弹出）
+  function renderBrandDatabasePage() {
+    var existingPanel = document.getElementById('electronBrandPanel');
+    if (existingPanel) { existingPanel.remove(); return; }
+    fetch('/api/brands/list').then(function(r){return r.json()}).then(function(d){
+      var brands = d.brands || [];
+      var html = '<div id="electronBrandPanel" style="position:fixed;top:0;left:220px;right:0;bottom:0;z-index:50;background:var(--bg-primary,#0f172a);padding:20px;overflow-y:auto;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
+      html += '<h2 style="font-size:18px;font-weight:700;">品牌数据库</h2>';
+      html += '<button onclick="this.closest(\'#electronBrandPanel\').remove()" style="background:none;border:none;color:#86868b;font-size:20px;cursor:pointer;">✕</button></div>';
+      html += '<div style="margin-bottom:12px;"><input placeholder="搜索品牌..." oninput="var v=this.value.toLowerCase();document.querySelectorAll(\'#electronBrandPanel tbody tr\').forEach(function(r){r.style.display=r.textContent.toLowerCase().indexOf(v)>=0?\'\':\'none\'})"></div>';
+      html += '<table style="width:100%;font-size:12px;border-collapse:collapse;"><thead><tr style="text-align:left;color:#86868b;text-transform:uppercase;font-size:10px;border-bottom:1px solid rgba(255,255,255,0.06);">';
+      html += '<th style="padding:8px;">标准名</th><th style="padding:8px;">别名</th><th style="padding:8px;">类型</th><th style="padding:8px;">产地</th>';
+      html += '</tr></thead><tbody>';
+      brands.forEach(function(b){
+        html += '<tr style="border-bottom:1px solid rgba(255,255,255,0.03);">';
+        html += '<td style="padding:8px;font-weight:500;">'+esc(b.display_name||b.name)+'</td>';
+        html += '<td style="padding:8px;color:#98989d;">'+esc((b.aliases||[]).join(', '))+'</td>';
+        html += '<td style="padding:8px;">'+esc(b.type||'')+'</td>';
+        html += '<td style="padding:8px;">'+esc(b.country||'')+'</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      document.body.appendChild(document.createRange().createContextualFragment(html));
+    });
+  }
+
+  function renderCategoryTreePage() {
+    var existingPanel = document.getElementById('electronCategoryPanel');
+    if (existingPanel) { existingPanel.remove(); return; }
+    var html = '<div id="electronCategoryPanel" style="position:fixed;top:0;left:220px;right:0;bottom:0;z-index:50;background:#0f172a;padding:20px;overflow-y:auto;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
+    html += '<h2 style="font-size:18px;font-weight:700;">分类路径树</h2>';
+    html += '<button onclick="this.closest(\'#electronCategoryPanel\').remove()" style="background:none;border:none;color:#86868b;font-size:20px;cursor:pointer;">✕</button></div>';
+    html += '<p style="color:#94a3b8;">上传文件诊断后，分类树将在此显示。</p>';
+    html += '</div>';
+    document.body.appendChild(document.createRange().createContextualFragment(html));
+  }
+
+  // Init
+  renderSteps();
+  loadElectronGroups();
+  loadElectronHistory();
+})();
+</script>
 
 </body>
 </html>

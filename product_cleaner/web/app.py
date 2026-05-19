@@ -1103,11 +1103,9 @@ def register_routes(app):
 
     @app.route('/electron')
     def electron_app():
-        """Serve the Electron-specific layout."""
-        from ..templates.html_templates import ELECTRON_LAYOUT, SIDEBAR_TEMPLATE, TAB_BAR_TEMPLATE
-        import json as _json
-        html = ELECTRON_LAYOUT.replace('{sidebar}', _json.dumps(SIDEBAR_TEMPLATE)).replace('{tab_bar}', _json.dumps(TAB_BAR_TEMPLATE))
-        return render_template_string(html)
+        """Serve the Electron layout — same HTML content with sidebar shell."""
+        from ..templates.html_templates import HTML_TEMPLATE
+        return render_template_string(HTML_TEMPLATE)
 
     @app.route('/api/shutdown', methods=['POST'])
     def shutdown():
