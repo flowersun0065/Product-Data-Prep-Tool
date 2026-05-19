@@ -46,22 +46,14 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Layout ── */
 .app-layout {
   display: flex;
-  height: 100vh;
-}
-
-/* ── Sidebar ── */
-.sidebar {
-  width: 220px;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-primary);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
+  flex: 1;
   overflow: hidden;
 }
 
@@ -177,6 +169,7 @@ body {
 /* ── Title Bar (hiddenInset mode — draggable area) ── */
 .title-bar {
   height: 38px;
+  min-height: 38px;
   -webkit-app-region: drag;
   display: flex;
   align-items: center;
@@ -185,6 +178,18 @@ body {
   font-size: 11px;
   font-weight: 500;
   flex-shrink: 0;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-primary);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 /* ── Detail Panel (slide-in from right) ── */
