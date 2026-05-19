@@ -621,9 +621,10 @@ HTML_TEMPLATE = '''
   <div id="electronDetailContent"></div>
 </div>
 
+<script src="/static/js/electron_init.js"></script>
 <script>
-// ═══ Electron 侧边栏逻辑 ═══
-(function(){
+// ═══ (Legacy inline Electron logic replaced by electron_init.js) ═══
+(function(){ return; }
   var isElectron = (window.electronAPI !== undefined) || (window.location.pathname === '/electron');
   if (!isElectron) return;
 
@@ -648,7 +649,7 @@ HTML_TEMPLATE = '''
     el.innerHTML = steps.map(function(s){
       var cls = 'electron-sidebar-item';
       if (s.id === currentStep) cls += ' active';
-      return '<div class="'+cls+'" onclick="electronSwitchStep(\''+s.id+'\')">'+s.label+'</div>';
+      return '<div class="'+cls+'" data-step="'+s.id+'" onclick="electronSwitchStep(this.dataset.step)">'+s.label+'</div>';
     }).join('');
   }
 
@@ -704,7 +705,7 @@ HTML_TEMPLATE = '''
     if (!el) return;
     fetch('/api/recent_files').then(function(r){return r.json()}).then(function(files){
       el.innerHTML = (files||[]).slice(0,5).map(function(f){
-        return '<div class="electron-sidebar-item" style="font-size:10px" onclick="importRecentFile(\''+f.id+'\')">'+
+        return '<div class="electron-sidebar-item" style="font-size:10px" data-fileid="'+f.id+'" onclick="importRecentFile(this.dataset.fileid)">'+
           (f.time||'').split(' ')[0]+' · '+(f.name||'').substring(0,20)+'</div>';
       }).join('');
     }).catch(function(){});
