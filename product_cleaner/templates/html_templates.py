@@ -811,8 +811,8 @@ ELECTRON_LAYOUT = """
   <script>
     // Initialize Electron layout
     document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('sidebarContainer').innerHTML = SIDEBAR_TEMPLATE;
-      document.getElementById('tabBarContainer').innerHTML = TAB_BAR_TEMPLATE;
+      document.getElementById('sidebarContainer').innerHTML = {sidebar};
+      document.getElementById('tabBarContainer').innerHTML = {tab_bar};
       if (typeof initSidebar === 'function') initSidebar();
       if (typeof initTabBar === 'function') initTabBar();
       if (typeof loadGroups === 'function') loadGroups();
