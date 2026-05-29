@@ -78,11 +78,15 @@ SESSION_PROCESSING_TIMEOUT = timedelta(minutes=30)
 def _serialize_session(sess: Dict) -> Dict:
     """提取 session 中需要持久化的字段"""
     return {
+        'session_id': sess.get('session_id'),
+        'group_id': sess.get('group_id'),
         'file_path': sess.get('file_path'),
+        'file_name': Path(sess.get('file_path', '')).name if sess.get('file_path') else '',
         'col_mapping': sess.get('col_mapping'),
         'status': sess.get('status'),
         'created': sess.get('created').isoformat() if isinstance(sess.get('created'), datetime) else sess.get('created'),
         'brand_rules': sess.get('brand_rules', {}),
+        'category_rules': sess.get('category_rules', {}),
         'new_brands': sess.get('new_brands', []),
         'confirmed_brands': sess.get('confirmed_brands', []),
         'diagnosis_status': sess.get('diagnosis_status'),
@@ -256,6 +260,20 @@ def load_session_snapshots():
                     with open(f, 'r', encoding='utf-8') as fh:
                         sess_data = json.load(fh)
                     sid = sess_data.get('session_id', f.stem)
+                    # 从 JSON 恢复 datetime 字段
+                    if isinstance(sess_data.get('created'), str):
+                        try:
+                            sess_data['created'] = datetime.fromisoformat(sess_data['created'])
+                        except Exception:
+                            sess_data['created'] = datetime.now()
+                    # 服务重启后处理线程已死，清除残留状态
+                    if sess_data.get('status') == 'processing':
+                        sess_data['status'] = 'cancelled'
+                        try:
+                            with open(f, 'w', encoding='utf-8') as fh2:
+                                json.dump(sess_data, fh2, ensure_ascii=False, indent=2)
+                        except Exception:
+                            pass
                     sessions[sid] = sess_data
                     loaded += 1
                 except Exception as e:
@@ -336,7 +354,14 @@ def diagnose_async(session_id: str, file_path: str, col_mapping: Dict):
     session['diagnosis_status'] = 'processing'
     session['diagnosis_progress'] = 0
     session['diagnosis_logs'] = []
+    session['step_logs'] = {'reading': [], 'brands': [], 'categories': [], 'finalizing': []}
     session['step_times'] = {}
+
+    def _log(msg):
+        session['diagnosis_logs'].append(msg)
+        step = session.get('current_step', 'reading')
+        if step in session['step_logs']:
+            session['step_logs'][step].append(msg)
     step_times = session['step_times']
     import time as _time
 
@@ -357,29 +382,23 @@ def diagnose_async(session_id: str, file_path: str, col_mapping: Dict):
             raise ValueError(error_msg)
 
         file_size = filepath.stat().st_size
-        session['diagnosis_logs'].append(f"文件大小: {file_size / 1024:.1f} KB")
 
-        # 尝试不同的引擎读取 Excel
         df = None
         last_error = None
         for engine in ['openpyxl', 'xlrd']:
             try:
                 df = pd.read_excel(file_path, engine=engine)
-                session['diagnosis_logs'].append(f"使用引擎: {engine}")
                 break
             except Exception as e:
                 last_error = str(e)
-                session['diagnosis_logs'].append(f"引擎 {engine} 失败: {e}")
                 continue
 
-        # 如果指定引擎都失败，尝试自动检测
         if df is None:
             try:
                 df = pd.read_excel(file_path)
-                session['diagnosis_logs'].append("使用引擎: auto")
+                engine = 'auto'
             except Exception as e:
                 last_error = str(e)
-                session['diagnosis_logs'].append(f"引擎 auto 失败: {e}")
 
         if df is None:
             error_detail = f"\n最后错误: {last_error}" if last_error else ""
@@ -387,18 +406,36 @@ def diagnose_async(session_id: str, file_path: str, col_mapping: Dict):
 
         df = df.replace({np.nan: None})
         step_times['reading_end'] = _time.time()
+        reading_time = step_times['reading_end'] - step_times['reading_start']
+        total_rows = len(df)
+        cols_used = [v for v in col_mapping.values() if v in df.columns]
+        brand_candidates = df[col_mapping.get('brand_name')].dropna().unique().tolist() if col_mapping.get('brand_name') and col_mapping.get('brand_name') in df.columns else []
 
         session['diagnosis_progress'] = 10
-        session['diagnosis_logs'].append("正在读取文件...")
+        _log(f"→ 调用 tool_read_excel(): 引擎={engine}, 耗时 {reading_time:.1f}s")
+        _log(f"→ 读取 {total_rows} 行, {file_size / 1024:.1f} KB")
+        _log(f"→ 提取列: {', '.join(cols_used[:8])}{'...' if len(cols_used) > 8 else ''}")
+        if brand_candidates:
+            _log(f"→ 发现 {len(brand_candidates)} 个品牌候选值")
 
         session['current_step'] = 'brands'
         session['current_step_start'] = _time.time()
         step_times['brands_start'] = _time.time()
         session['diagnosis_progress'] = 20
-        session['diagnosis_logs'].append("正在分析品牌与分类（预计 40 秒）...")
+        _log("→ 调用 tool_brand_cluster(): 聚类分析商品名称...")
         code_col = col_mapping.get('org_spu_code')
         brand_clusters = BrandClusterEngine.cluster(df, col_mapping['org_spu_name'], col_mapping.get('brand_name'), code_col, col_mapping)
         step_times['brands_end'] = _time.time()
+        brand_time = step_times['brands_end'] - step_times['brands_start']
+
+        # Aggregate cluster stats for log
+        valid_count = sum(c.get('count', 0) for c in brand_clusters if c.get('type') == 'valid')
+        missing_count = sum(c.get('count', 0) for c in brand_clusters if c.get('type') == 'missing')
+        mismatch_count = sum(c.get('count', 0) for c in brand_clusters if c.get('type') == 'mismatch')
+        unbranded_count = sum(c.get('count', 0) for c in brand_clusters if c.get('type') == 'unbranded')
+        cluster_count = len(brand_clusters)
+        _log(f"→ 生成 {cluster_count} 个品牌簇, 耗时 {brand_time:.1f}s")
+        _log(f"→ 品牌库匹配: 确立 {valid_count}, 缺失 {missing_count}, 异常 {mismatch_count}" + (f", 无品牌候选 {unbranded_count}" if unbranded_count else ""))
 
         # 加载持久化的确认规则，注入 session
         from ..brands.database import load_corrected_products
@@ -499,16 +536,28 @@ def diagnose_async(session_id: str, file_path: str, col_mapping: Dict):
                 seen_new_brands.add(b_name)
 
         session['new_brands'] = auto_new_brands
+        if auto_new_brands:
+            _log(f"→ 调用 tool_brand_discover(): 发现 {len(auto_new_brands)} 个新品牌候选")
 
         session['diagnosis_progress'] = 80
-        session['diagnosis_logs'].append("正在分析分类（Code 归集逻辑）...")
         session['current_step'] = 'categories'
+        _log("→ 调用 tool_category_analysis(): Code 归集逻辑...")
         session['current_step_start'] = _time.time()
         step_times['categories_start'] = _time.time()
         name_col = col_mapping.get('org_spu_name')
         entity_dict = build_entity_dict(df[name_col].dropna().astype(str).tolist()) if name_col else {}
         category_result = CategoryDetector.analyze(df, col_mapping, entity_dict)
         step_times['categories_end'] = _time.time()
+        cate_time = step_times['categories_end'] - step_times['categories_start']
+        cate_stats = category_result['stats']
+        path_count = len(category_result.get('cleaned_paths', {}))
+        conflict_count = cate_stats.get('conflict_count', 0)
+        marketing_count = cate_stats.get('pure_marketing_count', 0)
+        missing_count_cate = cate_stats.get('missing_count', 0)
+        _log(f"→ 归集 {path_count} 条标准路径, 耗时 {cate_time:.1f}s")
+        if conflict_count: _log(f"→ 发现 {conflict_count} 个分类冲突, 待人工确认")
+        if marketing_count: _log(f"→ 识别 {marketing_count} 个营销文案节点, 分离至营销标签")
+        if missing_count_cate: _log(f"→ 分类缺失 {missing_count_cate} 项, 已生成建议")
 
         # 应用分类修正记录
         from ..brands.database import load_corrected_categories
@@ -537,8 +586,11 @@ def diagnose_async(session_id: str, file_path: str, col_mapping: Dict):
                             ac['suggested_path'] = [entry['corrected_path']]
         
         
+        session['current_step'] = 'finalizing'
+        session['current_step_start'] = _time.time()
+        step_times['finalizing_start'] = _time.time()
         session['diagnosis_progress'] = 90
-        session['diagnosis_logs'].append("正在精简数据...")
+        _log("→ 调用 tool_finalize(): 精简集群数据 & 生成路由输出...")
         lean_clusters_data = lean_clusters(brand_clusters)
 
         stats = category_result['stats']
@@ -567,12 +619,14 @@ def diagnose_async(session_id: str, file_path: str, col_mapping: Dict):
             'need_ai': int(need_ai)
         }
 
+        step_times['finalizing_end'] = _time.time()
         with _get_session_lock(session_id):
             session['diagnosis_progress'] = 100
             session['diagnosis_result'] = diagnosis_result
             session['diagnosis_stats'] = diagnosis_stats
             session['current_step'] = ''
-            session['diagnosis_logs'].append("诊断完成!")
+            total_elapsed = _time.time() - step_times.get('reading_start', _time.time())
+            _log(f"→ Pipeline 完成! 总耗时 {total_elapsed:.1f}s, 结果集已打包")
             session['diagnosis_status'] = 'completed'
 
         save_session_snapshots(session_id)
@@ -581,7 +635,7 @@ def diagnose_async(session_id: str, file_path: str, col_mapping: Dict):
         logger.error(f"Diagnosis error: {e}")
         session['diagnosis_status'] = 'error'
         session['diagnosis_error'] = str(e)
-        session['diagnosis_logs'].append(f"错误: {e}")
+        _log(f"错误: {e}")
 
 
 def _find_optional_column(df, *patterns) -> Optional[str]:
@@ -617,13 +671,22 @@ def _build_result_entry(item, brand_info=None, cat_info=None) -> dict:
     else:
         brand_name = item.get('brand', '')
 
+    if cat_info:
+        category_ai = cat_info.get('path', '')
+    else:
+        category_ai = item.get('category', '')
+
     spec_from_name = SpecExtractor.extract(item['name'])[1] or ''
+    spec_weight = SpecExtractor.extract_weight_spec(item['name']) or ''
+    spec_pack = SpecExtractor.extract_pack_spec(item['name']) or ''
 
     tags = compute_all_tags(
         brand_name=brand_name,
         org_prom_price=item.get('_org_prom_price', ''),
         org_recommend_tag=item.get('_org_recommend_tag', ''),
-        category_path=item.get('category', ''),
+        org_prom_spu_tag=item.get('_org_prom_spu_tag', ''),
+        category_path=category_ai or item.get('category', ''),
+        product_name=item.get('name', ''),
     )
 
     entry = {
@@ -634,7 +697,10 @@ def _build_result_entry(item, brand_info=None, cat_info=None) -> dict:
         'brand_status': brand_info.get('status', '') if brand_info else '',
         'brand_reason': brand_info.get('reason', '') if brand_info else '',
         'spec_from_name': spec_from_name,
-        'category_ai': cat_info.get('path', '') if cat_info else '',
+        'spec_weight': spec_weight,
+        'spec_pack': spec_pack,
+        'category_original': item.get('category_original', ''),
+        'category_ai': category_ai,
         'category_confidence': cat_info.get('confidence', 0) if cat_info else 0,
         'category_method': cat_info.get('method', '') if cat_info else '',
         'category_reason': cat_info.get('reason', '') if cat_info else '',
@@ -662,19 +728,27 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
                        ai_provider: str = None,
                        api_key: str = None,
                        model_id: str = None,
-                       force_reanalyze: bool = False):
+                       force_reanalyze: bool = False,
+                       base_url: str = ''):
     """后台异步处理文件 - 支持 AI 按字段处理"""
     session = sessions[session_id]
     session['status'] = 'processing'
+    session['ai_phase'] = 'startup'
+    session['cancel_requested'] = False
     session['logs'] = []
     session['ai_logs'] = []  # 增量日志（consumed by /api/ai_logs）
     session['processed'] = 0
     session['ai_total'] = 0
     session['ai_skipped'] = 0
     session['review_pending'] = []
+    session['batch_logs'] = []
+    session['token_usage'] = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+    session['ai_errors'] = 0
+    session['ai_paused'] = False
     session['start_time'] = datetime.now()
 
     try:
+        session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] 正在读取源数据...")
         df = pd.read_excel(session['file_path'])
         df = df.replace({np.nan: None})
 
@@ -695,6 +769,7 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
         # 检测标签计算所需的可选原始列
         org_prom_price_col = _find_optional_column(df, 'prom_price', '促销价')
         org_recommend_tag_col = _find_optional_column(df, 'recommend_tag', '推荐标签')
+        org_prom_spu_tag_col = _find_optional_column(df, 'prom_spu_tag', '促销标签')
 
         brand_rules = session.get('brand_rules', {})
         cat_rules = rules.get('categories', {})
@@ -709,6 +784,23 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
                     sb = item.get('suggested_brand')
                     if sb:
                         code_suggestion[c] = sb
+
+        # 从诊断结果的 all_codes 构建 code→全部原始分类路径索引（给 AI 多路径分析用）
+        # 同时构建 code→系统建议分类路径索引
+        code_all_paths = {}
+        code_suggested_cat = {}
+        code_all_standard_paths = {}
+        for ac in diagnosis_result.get('all_codes', []):
+            c = ac.get('code', '')
+            paths = ac.get('all_paths', [])
+            if c and paths:
+                code_all_paths[c] = paths
+            sp = (ac.get('suggested_path') or [''])[0]
+            if c and sp:
+                code_suggested_cat[c] = sp
+            std_paths = ac.get('standard_paths', [])
+            if c and std_paths:
+                code_all_standard_paths[c] = std_paths
 
         # 构建所有商品的判断列表（按 code 去重）
         all_items = []
@@ -727,8 +819,12 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
             category = f"{cate1} > {cate2} > {cate3}" if cate3 else ''
 
             # 标签计算所需的原始行值
-            _org_prom_price = str(row.get(org_prom_price_col, '')).strip() if org_prom_price_col else ''
-            _org_recommend_tag = str(row.get(org_recommend_tag_col, '')).strip() if org_recommend_tag_col else ''
+            val = row.get(org_prom_price_col)
+            _org_prom_price = str(val).strip() if val is not None else ''
+            val = row.get(org_recommend_tag_col)
+            _org_recommend_tag = str(val).strip() if val is not None else ''
+            val = row.get(org_prom_spu_tag_col)
+            _org_prom_spu_tag = str(val).strip() if val is not None else ''
 
             if not name:
                 continue
@@ -750,7 +846,9 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
                 'name': name,
                 'brand': brand,
                 'spec': spec,
-                'category': category,
+                'category': code_suggested_cat.get(code) or category,  # 优先用系统建议，没有则用原始
+                'category_original': '; '.join(code_all_standard_paths.get(code, [category])) if code_all_standard_paths.get(code) else category,  # 全部标准路径
+                'all_category_paths': code_all_paths.get(code, []),  # 全部分类路径（给 AI 多路径分析用）
                 'needs_brand_ai': needs_brand_ai,
                 'needs_category_ai': needs_category_ai,
                 'has_brand_confirmed': bool(brand_rule) and not brand_rule.get('skipped'),
@@ -758,6 +856,7 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
                 'existing_suggestion': code_suggestion.get(code, ''),  # 诊断阶段的品牌建议
                 '_org_prom_price': _org_prom_price,
                 '_org_recommend_tag': _org_recommend_tag,
+                '_org_prom_spu_tag': _org_prom_spu_tag,
             })
 
         # 统计（分字段）
@@ -805,12 +904,14 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
         has_ai_engine = False
         engine = None
 
+        session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] 正在连接 AI 引擎: {ai_provider}/{model_id or '默认'}")
         if need_ai_items and ai_provider and api_key:
             try:
                 engine = ProductCleanerEngine(
                     api_key=api_key,
                     provider=ai_provider,
-                    model_id=model_id
+                    model_id=model_id,
+                    base_url=base_url if base_url else None  # 传自定义 base_url
                 )
                 has_ai_engine = True
                 session['logs'].append(
@@ -878,11 +979,28 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
                 f"待 AI 处理 {len(uncached_items)} 条"
             )
 
+        # 连通性测试
+        if has_ai_engine:
+            session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] 正在测试 AI 连通性...")
+            try:
+                engine._call_ai("hello", max_tokens=10)
+                session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] AI 连通性测试通过")
+            except Exception as e:
+                session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] AI 连通性测试失败: {e}")
+                session['ai_phase'] = 'error'
+                session['status'] = 'error'
+                session['message'] = f'AI 连通性测试失败: {e}'
+                return
+
+        session['ai_phase'] = 'processing'
+        session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] 开始批处理，共 {len(need_ai_items)} 条待 AI 处理")
+
         # 分批处理需要 AI 的条目（仅未缓存的）
         for batch_idx in range(0, len(uncached_items), batch_size):
             # 检查是否被取消
             if session.get('cancel_requested'):
                 session['status'] = 'cancelled'
+                session['ai_phase'] = 'cancelled'
                 session['message'] = f'用户取消，已处理 {len(all_results)} 条'
                 session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] 用户取消处理")
                 break
@@ -890,14 +1008,46 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
             batch = uncached_items[batch_idx:batch_idx + batch_size]
             batch_results = []
 
+            # 标记批次开始（前端用 ai_batch_active 建 active 卡片）
+            session['ai_batch_active'] = len(session.get('batch_logs', [])) + 1
+            session['ai_batch_items_done'] = 0
+
             if has_ai_engine:
-                # AI 模式
+                # 逐条回调：进度+token+完整日志（含品牌/分类理由），前端 task panel 实时显示
+                def _on_item_progress(idx, total, result):
+                    session["ai_batch_items_done"] = idx
+                    t = result.get("_tokens") or {}
+                    if t.get("total_tokens", 0) > 0:
+                        u = session.get("token_usage", {})
+                        for k in ["prompt_tokens","completion_tokens","total_tokens"]:
+                            u[k] = u.get(k,0) + t.get(k,0)
+                        session["token_usage"] = u
+                    br = result.get("brand", {})
+                    cr = result.get("category", {})
+                    f = cr.get("factors", {})
+                    session["ai_logs"].append({
+                        "name": result.get("name", ""),
+                        "code": result.get("code", ""),
+                        "brand": br,
+                        "category": cr,
+                        "tokens": result.get("_tokens"),
+                        "factors": {
+                            "entity": f.get("entity", ""),
+                            "modifiers": f.get("modifiers", []),
+                            "brand_type": f.get("brand_type", ""),
+                            "brand_reason": br.get("reason", ""),
+                            "cat_reason": cr.get("reason", ""),
+                        },
+                        "needs_review": result.get("needs_review", False),
+                    })
+
                 ai_results = engine.process_batch(
                     batch,
                     fields=['brand', 'category'],
                     entity_dict=entity_dict,
                     cleaned_paths=cleaned_paths,
                     category_options=category_options,
+                    progress_callback=_on_item_progress,
                 )
                 for item, ai_res in zip(batch, ai_results):
                     # 写入缓存（带输入指纹，同组共享）
@@ -937,20 +1087,86 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
                     entry['brand_ai'] = extracted_brand or item['brand']
                     entry['brand_confidence'] = 0.8 if extracted_brand else 0.5
                     entry['brand_status'] = 'local'
-                    entry['needs_review'] = not extracted_brand
-                    entry['review_status'] = '待复核' if entry['needs_review'] else '已确认'
+                    # 本地模式：保留原始分类作为建议值
+                    entry['category_status'] = 'local'
+                    entry['category_confidence'] = 0.6
+                    entry['needs_review'] = True
+                    entry['review_status'] = '待复核'
                     batch_results.append(entry)
                     log_entry = {
                         'name': item['name'],
                         'code': item['code'],
                         'brand': {'status': 'local', 'value': entry['brand_ai'], 'confidence': entry['brand_confidence']},
-                        'category': {'status': 'skipped', 'path': '', 'confidence': 0.0},
+                        'category': {'status': 'local', 'path': entry.get('category_ai', ''), 'confidence': entry.get('category_confidence', 0)},
                         'needs_review': entry['needs_review']
                     }
                     session['ai_logs'].append(log_entry)
                     if entry.get('needs_review'):
                         session['review_pending'].append(entry)
 
+            # batch-level token 统计 + per-item 数据
+            batch_tokens = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+            batch_items = []
+            sample_prompt = ''
+            if has_ai_engine:
+                for i, r in enumerate(batch_results):
+                    t = r.get('_tokens') or {}
+                    for k in batch_tokens:
+                        batch_tokens[k] += t.get(k, 0) or 0
+                    # _prompt 在 ai_results 里，不在 _build_result_entry 里
+                    aip = ai_results[i].get('_prompt') if i < len(ai_results) else ''
+                    if not sample_prompt and aip:
+                        sample_prompt = aip
+                    ai_item = ai_results[i]
+                    brand_info = ai_item.get('brand', {})
+                    cat_info = ai_item.get('category', {})
+                    batch_items.append({
+                        'name': batch[i]['name'] if i < len(batch) else '',
+                        'code': r.get('code', ''),
+                        'brand': r.get('brand_ai', ''),
+                        'category': r.get('category_ai', ''),
+                        'brand_status': brand_info.get('status', ''),
+                        'brand_type': brand_info.get('brand_type', ''),
+                        'brand_confidence': brand_info.get('confidence', 0),
+                        'brand_reason': brand_info.get('reason', ''),
+                        'brand_suggestion': brand_info.get('suggestion', ''),
+                        'cat_path': cat_info.get('path', ''),
+                        'cat_confidence': cat_info.get('confidence', 0),
+                        'cat_method': cat_info.get('method', cat_info.get('status', '')),
+                        'cat_reason': cat_info.get('reason', ''),
+                        'cat_entity': (cat_info.get('factors', {}) or {}).get('entity', ''),
+                        'cat_modifiers': ', '.join((cat_info.get('factors', {}) or {}).get('modifiers', []) or []),
+                        'tokens': t,
+                        'prompt': (ai_results[i].get('_prompt') or '')[:2000] if i < len(ai_results) else '',
+                    })
+                for k in batch_tokens:
+                    session['token_usage'][k] = session['token_usage'].get(k, 0) + batch_tokens[k]
+
+            session['batch_logs'].append({
+                'batch': len(session['batch_logs']) + 1,
+                'count': len(batch),
+                'tokens': batch_tokens,
+                'cumulative_tokens': dict(session['token_usage']),
+                'status': 'completed',
+                'method': 'ai' if has_ai_engine else 'local',
+                'prompt': sample_prompt[:3000] if sample_prompt else '',
+                'time': datetime.now().strftime('%H:%M:%S'),
+                'items': batch_items,
+            })
+
+            # 检测 AI 连续错误，超过阈值暂停让用户选择
+            if has_ai_engine:
+                batch_errors = sum(1 for r in batch_results if (r.get('_tokens') or {}).get('total_tokens', 0) == 0)
+                if batch_errors >= len(batch_results) * 0.8:  # >=80% 失败
+                    session['ai_errors'] = session.get('ai_errors', 0) + 1
+                else:
+                    session['ai_errors'] = 0
+                if session['ai_errors'] >= 2:  # 连续2批 ≥80% 失败
+                    session['ai_paused'] = True
+                    session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] AI 连续调用失败，已暂停，等待用户选择")
+                    break
+
+            session['ai_batch_active'] = 0  # 本批结束，清活跃标志
             all_results.extend(batch_results)
             session['processed'] = len(all_results)
             session['progress'] = int(session['processed'] / len(need_ai_items) * 100) if need_ai_items else 100
@@ -976,8 +1192,17 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
                 result_df.to_excel(str(result_file), index=False)
                 session['result_file'] = str(result_file)
 
-                # 生成 review_file
-                review_df = result_df[result_df['needs_review'] == True] if 'needs_review' in result_df.columns else pd.DataFrame()
+                # 生成 review_file：原始 df 先去重再 merge ai 结果，避免源数据同 code 多行撑大
+                if code_col and code_col in original_df.columns and 'needs_review' in ai_df.columns:
+                    review_df = (
+                        original_df.drop_duplicates(subset=code_col, keep='first')
+                        .merge(ai_df[ai_df['needs_review'] == True],
+                               left_on=code_col, right_on='code', how='inner')
+                    )
+                elif 'needs_review' in ai_df.columns:
+                    review_df = ai_df[ai_df['needs_review'] == True]
+                else:
+                    review_df = pd.DataFrame()
                 if not review_df.empty:
                     review_file = RESULT_FOLDER / f"{session_id}_review_{uuid.uuid4().hex[:6]}.xlsx"
                     review_df.to_excel(str(review_file), index=False)
@@ -1005,6 +1230,8 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
             entry = _build_result_entry(item)
             entry['brand_confidence'] = 1.0
             entry['brand_status'] = 'skipped'
+            entry['category_status'] = 'skipped'
+            entry['category_confidence'] = 1.0
             combined.append(entry)
         combined.extend(all_results)
 
@@ -1020,7 +1247,16 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
             result_df.to_excel(str(result_file), index=False)
             session['result_file'] = str(result_file)
 
-            review_df = result_df[result_df['needs_review'] == True] if 'needs_review' in result_df.columns else pd.DataFrame()
+            if code_col and code_col in original_df.columns and 'needs_review' in ai_df.columns:
+                review_df = (
+                    original_df.drop_duplicates(subset=code_col, keep='first')
+                    .merge(ai_df[ai_df['needs_review'] == True],
+                           left_on=code_col, right_on='code', how='inner')
+                )
+            elif 'needs_review' in ai_df.columns:
+                review_df = ai_df[ai_df['needs_review'] == True]
+            else:
+                review_df = pd.DataFrame()
             if not review_df.empty:
                 review_file = RESULT_FOLDER / f"{session_id}_review_{uuid.uuid4().hex[:6]}.xlsx"
                 review_df.to_excel(str(review_file), index=False)
@@ -1029,6 +1265,7 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
         # 如果被取消，不要覆盖 cancelled 状态
         if session.get('status') != 'cancelled':
             session['status'] = 'completed'
+            session['ai_phase'] = 'error' if session.get('ai_paused') else 'completed'
             session['progress'] = 100
             session['message'] = (
                 f'处理完成! AI处理{len(uncached_items)}条, '
@@ -1043,6 +1280,7 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
     except Exception as e:
         logger.error(f"Processing error: {e}")
         session['status'] = 'error'
+        session['ai_phase'] = 'error'
         session['message'] = str(e)
         session['end_time'] = datetime.now()
         session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] 错误: {e}")
@@ -1091,6 +1329,10 @@ _groups_cache = _load_groups()
 
 def register_routes(app):
 
+    # Agent 路由（对话 + 工具）
+    from ..agent.routes_agent import register_agent_routes
+    register_agent_routes(app)
+
     @app.route('/')
     def index():
         from ..templates.html_templates import HTML_TEMPLATE
@@ -1099,13 +1341,56 @@ def register_routes(app):
     @app.route('/review')
     def review_page():
         from ..templates.html_templates import REVIEW_TEMPLATE
+        if request.args.get('embed'):
+            import re
+            html = REVIEW_TEMPLATE
+            # Strip shell elements; keep <style> and #review-app content only
+            html = re.sub(r'</?html[^>]*>', '', html, flags=re.IGNORECASE)
+            html = re.sub(r'</?head[^>]*>', '', html, flags=re.IGNORECASE)
+            html = re.sub(r'</?body[^>]*>', '', html, flags=re.IGNORECASE)
+            html = re.sub(r'<!DOCTYPE[^>]*>', '', html, flags=re.IGNORECASE)
+            html = re.sub(r'<meta[^>]*>', '', html, flags=re.IGNORECASE)
+            html = re.sub(r'<title[^>]*>.*?</title>', '', html, flags=re.IGNORECASE)
+            html = re.sub(r'<script src="https://cdn.tailwindcss.com"[^>]*></script>', '', html)
+            html = re.sub(r'<script src="/static/js/common.js"[^>]*></script>', '', html)
+            html = re.sub(r'<script src="/static/js/review.js"[^>]*></script>', '', html)
+            # Remove #detailOverlay and #detailPanel (electron uses shared ones)
+            overlay_start = html.find('<div id="detailOverlay"')
+            panel_start = html.find('<div id="detailPanel"')
+            if overlay_start != -1 and panel_start != -1:
+                html = html[:overlay_start].rstrip()
+            return html
         return render_template_string(REVIEW_TEMPLATE)
 
     @app.route('/electron')
     def electron_app():
-        """Serve the Electron layout — same HTML content with sidebar shell."""
-        from ..templates.html_templates import HTML_TEMPLATE
-        return render_template_string(HTML_TEMPLATE)
+        """Serve the standalone Electron page."""
+        import os as _os
+        _path = _os.path.join(_os.path.dirname(__file__), '..', 'electron', 'index.html')
+        with open(_path, 'r', encoding='utf-8') as _f:
+            return _f.read()
+
+    @app.route('/electron/js/<path:filename>')
+    def electron_js(filename):
+        """Serve Electron-specific JS files."""
+        import os as _os
+        _dir = _os.path.join(_os.path.dirname(__file__), '..', 'electron', 'js')
+        return __import__('flask').send_from_directory(_dir, filename)
+
+    @app.route('/electron/css/<path:filename>')
+    def electron_css(filename):
+        """Serve Electron-specific CSS files."""
+        import os as _os
+        _dir = _os.path.join(_os.path.dirname(__file__), '..', 'electron', 'css')
+        return __import__('flask').send_from_directory(_dir, filename)
+
+    @app.route('/settings')
+    def electron_settings():
+        """Serve the Electron settings page."""
+        import os
+        settings_path = os.path.join(os.path.dirname(__file__), '..', 'electron', 'settings.html')
+        with open(settings_path, 'r', encoding='utf-8') as f:
+            return f.read()
 
     @app.route('/api/shutdown', methods=['POST'])
     def shutdown():
@@ -1115,10 +1400,26 @@ def register_routes(app):
         _os.kill(_os.getpid(), signal.SIGTERM)
         return jsonify({'success': True})
 
+    def _get_settings_path():
+        """Resolve settings.json path, falling back to cache dir if not in Electron mode."""
+        import os as _os
+        if _electron_data_dir:
+            return Path(_electron_data_dir) / 'settings.json'
+        cache_dir = Path(_os.path.dirname(__file__)) / '..' / 'cache'
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir / 'settings.json'
+
+    def _get_settings():
+        """读取 settings.json 内容"""
+        sf = _get_settings_path()
+        if sf and sf.exists():
+            try: return json.load(open(sf))
+            except Exception: pass
+        return {}
+
     @app.route('/api/settings', methods=['GET'])
     def get_settings():
         """Return current settings."""
-        settings_file = Path(_electron_data_dir) / 'settings.json' if _electron_data_dir else None
         defaults = {
             'ai_provider': 'gemini',
             'model_id': 'gemini-2.0-flash',
@@ -1129,17 +1430,19 @@ def register_routes(app):
             'language': 'zh',
             'startup_action': 'upload',
         }
+        settings_file = _get_settings_path()
         if settings_file and settings_file.exists():
-            saved = json.load(open(settings_file))
-            defaults.update(saved)
+            try:
+                saved = json.load(open(settings_file))
+                defaults.update(saved)
+            except Exception:
+                pass
         return jsonify(defaults)
 
     @app.route('/api/settings', methods=['PUT'])
     def save_settings():
         """Save settings."""
-        if not _electron_data_dir:
-            return jsonify({'error': 'No data directory configured'}), 500
-        settings_file = Path(_electron_data_dir) / 'settings.json'
+        settings_file = _get_settings_path()
         with open(settings_file, 'w') as f:
             json.dump(request.json, f, ensure_ascii=False, indent=2)
         return jsonify({'success': True})
@@ -1670,6 +1973,8 @@ def register_routes(app):
         files = []
         if UPLOAD_FOLDER.exists():
             for f in UPLOAD_FOLDER.iterdir():
+                if f.name.startswith('.') or f.name.startswith('~'):
+                    continue
                 if f.is_file() and f.suffix.lower() in ['.xlsx', '.xls']:
                     gid = file_group.get(f.name, '')
                     group_name = _groups_cache.get(gid, {}).get('name', '') if gid else ''
@@ -1780,6 +2085,76 @@ def register_routes(app):
         except Exception as e:
             return jsonify({'error': str(e)}), 400
 
+    @app.route('/api/sessions')
+    def list_sessions():
+        """列出所有 session"""
+        group_id = request.args.get('group_id', '')
+        result = []
+        for sid, sess in sessions.items():
+            if group_id and sess.get('group_id', '') != group_id:
+                continue
+            fp = sess.get('file_path', '')
+            created = sess.get('created')
+            created_str = created.isoformat() if isinstance(created, datetime) else str(created or '')
+            gid = sess.get('group_id', '')
+            result.append({
+                'session_id': sid,
+                'group_id': gid,
+                'group_name': _groups_cache.get(gid, {}).get('name', '') if gid else '',
+                'file_name': Path(fp).name if fp else '',
+                'display_name': Path(fp).stem if fp else sid,
+                'status': sess.get('status', ''),
+                'diagnosis_status': sess.get('diagnosis_status', ''),
+                'diagnosis_stats': sess.get('diagnosis_stats', {}),
+                'created': created_str
+            })
+        result.sort(key=lambda x: x['created'], reverse=True)
+        return jsonify({'sessions': result, 'total': len(result)})
+
+    @app.route('/api/session/switch', methods=['POST'])
+    def switch_session():
+        """切换 session：确保数据已加载"""
+        data = request.json or {}
+        sid = data.get('session_id', '')
+        if not sid:
+            return jsonify({'error': '缺少 session_id'}), 400
+        sess = sessions.get(sid)
+        if not sess:
+            # 尝试从 snapshot 加载
+            load_session_snapshots()
+            sess = sessions.get(sid)
+        if not sess:
+            return jsonify({'error': '会话不存在'}), 404
+        gid = sess.get('group_id', '')
+        result = {
+            'session_id': sid,
+            'group_id': gid,
+            'group_name': _groups_cache.get(gid, {}).get('name', '') if gid else '',
+            'file_name': Path(sess.get('file_path', '')).name if sess.get('file_path') else '',
+            'col_mapping': sess.get('col_mapping', {}),
+            'status': sess.get('status'),
+            'diagnosis_status': sess.get('diagnosis_status'),
+            'diagnosis_stats': sess.get('diagnosis_stats', {}),
+            'diagnosis_result': sess.get('diagnosis_result', {}),
+            'brand_rules': sess.get('brand_rules', {}),
+            'new_brands': sess.get('new_brands', []),
+            'confirmed_brands': sess.get('confirmed_brands', [])
+        }
+        return jsonify({'success': True, 'session': result})
+
+    @app.route('/api/session/delete', methods=['POST'])
+    def delete_session():
+        """删除 session"""
+        data = request.json or {}
+        sid = data.get('session_id', '')
+        if not sid:
+            return jsonify({'error': '缺少 session_id'}), 400
+        sess = sessions.get(sid)
+        if not sess:
+            return jsonify({'error': '会话不存在'}), 404
+        _remove_session(sid)
+        return jsonify({'success': True})
+
     @app.route('/api/diagnosis_status')
     def get_diagnosis_status():
         """获取诊断进度"""
@@ -1791,13 +2166,14 @@ def register_routes(app):
         session = sessions[session_id]
 
         from datetime import datetime
-        start_time = session.get('start_time')
+        start_time = session.get('created')
         elapsed = round((datetime.now() - start_time).total_seconds(), 1) if start_time else 0
 
         return jsonify({
             'status': session.get('diagnosis_status', 'pending'),
             'progress': session.get('diagnosis_progress', 0),
             'logs': session.get('diagnosis_logs', []),
+            'step_logs': session.get('step_logs', {}),
             'message': session.get('diagnosis_logs', [''])[-1] if session.get('diagnosis_logs') else '准备中...',
             'step_times': session.get('step_times', {}),
             'elapsed': elapsed,
@@ -1824,10 +2200,13 @@ def register_routes(app):
         if not diagnosis_result:
             return jsonify({'error': '诊断结果数据不完整，请重新诊断'}), 400
 
+        file_path = session.get('file_path', '')
+        file_name = Path(file_path).name if file_path else ''
         return jsonify({
             'success': True,
             'diagnosis': diagnosis_result,
             'stats': session.get('diagnosis_stats', {}),
+            'file_name': file_name,
             'category_options': diagnosis_result.get('category_options', {})
         })
 
@@ -2321,9 +2700,17 @@ def register_routes(app):
             'count': len(brands)
         })
 
-    @app.route('/api/brands/config')
-    def get_brand_config():
-        """获取品牌配置（类型列表+国家列表）"""
+    @app.route('/api/brands/config', methods=['GET', 'DELETE'])
+    def brand_config():
+        """获取品牌配置 或 删除品牌"""
+        if request.method == 'DELETE':
+            data = request.json or {}
+            brand_name = data.get('name', '').strip()
+            if not brand_name:
+                return jsonify({'success': False, 'error': '品牌名不能为空'})
+            from ..brands.database import remove_brand
+            remove_brand(brand_name)
+            return jsonify({'success': True})
         from ..brands.database import get_brand_config as load_config
         try:
             return jsonify(load_config())
@@ -2371,9 +2758,12 @@ def register_routes(app):
         del_country_fn(code)
         return jsonify({'success': True})
 
-    @app.route('/api/correction/brand', methods=['POST'])
-    def save_brand_correction():
-        """保存品牌建议修正记录"""
+    @app.route('/api/correction/brand', methods=['GET', 'POST'])
+    def brand_correction():
+        """获取或保存品牌建议修正记录"""
+        if request.method == 'GET':
+            from ..brands.database import load_corrected_brands
+            return jsonify(list(load_corrected_brands().items()))
         data = request.json
         suggested = data.get('suggested', '').strip()
         corrected_to = data.get('corrected_to', '').strip()
@@ -2555,17 +2945,30 @@ def register_routes(app):
         session_id = data.get('session_id')
         providers = data.get('providers', [])
         batch_size = data.get('batch_size', 20)
-        ai_provider = data.get('provider')  # gemini / claude / openai / deepseek
+        config_name = data.get('config_name')  # 新方式：配置名
+        ai_provider = data.get('provider')  # 兼容旧方式
         api_key = data.get('api_key')
         model_id = data.get('model_id')
+        base_url = data.get('base_url', '')
         force_reanalyze = data.get('force_reanalyze', False)
 
         if session_id not in sessions:
             return jsonify({'error': '会话不存在'}), 404
 
+        # 如果传了配置名，从 settings 查找实际参数
+        if config_name:
+            settings = _get_settings()
+            configs = settings.get('ai_configs', [])
+            cfg = next((c for c in configs if c.get('name') == config_name), None)
+            if cfg:
+                ai_provider = cfg.get('provider', ai_provider)
+                api_key = cfg.get('api_key', api_key)
+                model_id = cfg.get('model', model_id)
+                base_url = cfg.get('base_url', base_url)
+
         thread = threading.Thread(
             target=process_file_async,
-            args=(session_id, providers, batch_size, ai_provider, api_key, model_id, force_reanalyze)
+            args=(session_id, providers, batch_size, ai_provider, api_key, model_id, force_reanalyze, base_url)
         )
         thread.start()
 
@@ -2603,6 +3006,10 @@ def register_routes(app):
 
         return jsonify({
             'status': session.get('status', 'uploaded'),
+            'ai_phase': session.get('ai_phase', ''),
+            'ai_paused': session.get('ai_paused', False),
+            'ai_batch_active': session.get('ai_batch_active', 0),
+            'ai_batch_items_done': session.get('ai_batch_items_done', 0),
             'progress': session.get('progress', 0),
             'total': session.get('total', 0),
             'ai_total': session.get('ai_total', 0),
@@ -2614,6 +3021,8 @@ def register_routes(app):
             'processed': session.get('processed', 0),
             'message': session.get('message', ''),
             'logs': session.get('logs', []),
+            'batch_logs': session.get('batch_logs', []),
+            'token_usage': session.get('token_usage', {}),
             'review_pending': len(session.get('review_pending', [])),
             'review_file': session.get('review_file'),
             'result_file': session.get('result_file')
@@ -2672,6 +3081,8 @@ def register_routes(app):
                 ('brand_reason', ['brand_reason']),
                 ('spec_original', ['spu_spec']),
                 ('spec_from_name', ['spec_from_name']),
+                ('spec_weight', ['spec_weight']),
+                ('spec_pack', ['spec_pack']),
                 ('original_category', ['category_original']),
                 ('category_ai', ['category_ai']),
                 ('category_confidence', ['category_confidence']),
@@ -2826,6 +3237,171 @@ def register_routes(app):
         df.to_excel(str(tmp_path), index=False)
         return send_file(str(tmp_path), as_attachment=True,
                          download_name=f"export_{session_id}.xlsx")
+
+
+    # ═══ 词库管理（两层分组：类别 → 分组 → 词条） ═══
+    _LEXICON_JSON_PATH = Path(__file__).parent.parent / 'brands' / 'lexicon_words.json'
+    _LEXICON_CATEGORIES = [
+        {'key': 'provenance', 'label': '产地'},
+        {'key': 'storage', 'label': '存储方式'},
+        {'key': 'farming', 'label': '养殖方式'},
+        {'key': 'certification', 'label': '认证等级'},
+        {'key': 'marketing', 'label': '营销词'},
+        {'key': 'seasonal', 'label': '季节性'},
+        {'key': 'format', 'label': '规格封装'},
+        {'key': 'variety', 'label': '品种'},
+        {'key': 'processing', 'label': '加工方式'},
+        {'key': 'meat', 'label': '肉块'},
+        {'key': 'dairy_egg', 'label': '乳品蛋类'},
+        {'key': 'texture_flavor', 'label': '口感风味'},
+        {'key': 'product_type', 'label': '产品类型'},
+    ]
+
+    def _read_lexicon():
+        try:
+            with open(_LEXICON_JSON_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def _write_lexicon(data):
+        _LEXICON_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(_LEXICON_JSON_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        import sys
+        sys.modules.pop('product_cleaner.core.lexicon', None)
+        sys.modules.pop('product_cleaner.core.product_parser', None)
+
+    def _get_cat_data(data, category):
+        cat_data = data.get(category, {})
+        if not isinstance(cat_data, dict):
+            return {}
+        return cat_data
+
+    @app.route('/api/lexicon_words/categories', methods=['GET'])
+    def get_lexicon_categories():
+        data = _read_lexicon()
+        cats = []
+        for c in _LEXICON_CATEGORIES:
+            cat_data = _get_cat_data(data, c['key'])
+            cats.append({**c, 'count': sum(len(v) for v in cat_data.values())})
+        return jsonify({'categories': cats})
+
+    @app.route('/api/lexicon_words', methods=['GET'])
+    def get_lexicon_words():
+        category = request.args.get('category', 'variety')
+        cat_data = _get_cat_data(_read_lexicon(), category)
+        result = []
+        for subgroup, words in cat_data.items():
+            result.append({'subgroup': subgroup, 'words': sorted(words), 'count': len(words)})
+        return jsonify({'subgroups': result, 'total': sum(r['count'] for r in result)})
+
+    @app.route('/api/lexicon_words/add_word', methods=['POST'])
+    def add_lexicon_word():
+        req = request.json
+        category = req.get('category', '').strip()
+        subgroup = req.get('subgroup', '').strip()
+        word = req.get('word', '').strip()
+        if not category or not subgroup or not word:
+            return jsonify({'success': False, 'error': '参数不完整'})
+        data = _read_lexicon()
+        cat_data = _get_cat_data(data, category)
+        if subgroup not in cat_data:
+            return jsonify({'success': False, 'error': f'分组"{subgroup}"不存在'})
+        if word in cat_data[subgroup]:
+            return jsonify({'success': False, 'error': '该词已存在'})
+        cat_data[subgroup].append(word)
+        cat_data[subgroup].sort()
+        if category not in data:
+            data[category] = cat_data
+        _write_lexicon(data)
+        return jsonify({'success': True})
+
+    @app.route('/api/lexicon_words/delete_word', methods=['POST'])
+    def delete_lexicon_word():
+        req = request.json
+        category = req.get('category', '').strip()
+        subgroup = req.get('subgroup', '').strip()
+        word = req.get('word', '').strip()
+        if not category or not subgroup or not word:
+            return jsonify({'success': False, 'error': '参数不完整'})
+        data = _read_lexicon()
+        cat_data = _get_cat_data(data, category)
+        if subgroup not in cat_data or word not in cat_data[subgroup]:
+            return jsonify({'success': False, 'error': '该词不存在'})
+        cat_data[subgroup].remove(word)
+        _write_lexicon(data)
+        return jsonify({'success': True})
+
+    @app.route('/api/lexicon_words/rename_word', methods=['POST'])
+    def rename_lexicon_word():
+        req = request.json
+        category = req.get('category', '').strip()
+        subgroup = req.get('subgroup', '').strip()
+        old_word = req.get('old_word', '').strip()
+        new_word = req.get('new_word', '').strip()
+        if not category or not subgroup or not old_word or not new_word:
+            return jsonify({'success': False, 'error': '参数不完整'})
+        data = _read_lexicon()
+        cat_data = _get_cat_data(data, category)
+        if subgroup not in cat_data or old_word not in cat_data[subgroup]:
+            return jsonify({'success': False, 'error': '原词不存在'})
+        if new_word in cat_data[subgroup]:
+            return jsonify({'success': False, 'error': '新词已存在'})
+        cat_data[subgroup].remove(old_word)
+        cat_data[subgroup].append(new_word)
+        cat_data[subgroup].sort()
+        _write_lexicon(data)
+        return jsonify({'success': True})
+
+    @app.route('/api/lexicon_words/add_subgroup', methods=['POST'])
+    def add_lexicon_subgroup():
+        req = request.json
+        category = req.get('category', '').strip()
+        subgroup = req.get('subgroup', '').strip()
+        if not category or not subgroup:
+            return jsonify({'success': False, 'error': '参数不完整'})
+        data = _read_lexicon()
+        if category not in data:
+            data[category] = {}
+        if subgroup in data[category]:
+            return jsonify({'success': False, 'error': '该分组已存在'})
+        data[category][subgroup] = []
+        _write_lexicon(data)
+        return jsonify({'success': True})
+
+    @app.route('/api/lexicon_words/delete_subgroup', methods=['POST'])
+    def delete_lexicon_subgroup():
+        req = request.json
+        category = req.get('category', '').strip()
+        subgroup = req.get('subgroup', '').strip()
+        if not category or not subgroup:
+            return jsonify({'success': False, 'error': '参数不完整'})
+        data = _read_lexicon()
+        if category not in data or subgroup not in data[category]:
+            return jsonify({'success': False, 'error': '分组不存在'})
+        del data[category][subgroup]
+        _write_lexicon(data)
+        return jsonify({'success': True})
+
+    @app.route('/api/lexicon_words/rename_subgroup', methods=['POST'])
+    def rename_lexicon_subgroup():
+        req = request.json
+        category = req.get('category', '').strip()
+        old_name = req.get('old_name', '').strip()
+        new_name = req.get('new_name', '').strip()
+        if not category or not old_name or not new_name:
+            return jsonify({'success': False, 'error': '参数不完整'})
+        data = _read_lexicon()
+        if category not in data or old_name not in data[category]:
+            return jsonify({'success': False, 'error': f'分组"{old_name}"不存在'})
+        if new_name in data[category]:
+            return jsonify({'success': False, 'error': f'分组"{new_name}"已存在'})
+        data[category][new_name] = data[category].pop(old_name)
+        _write_lexicon(data)
+        return jsonify({'success': True})
+        _write_lexicon(data)
+        return jsonify({'success': True})
 
 
 # 创建应用实例

@@ -271,7 +271,10 @@ function renderLogEntry(log) {
     // 获取 AI 理由 + factors
     const brandReason = log.brand?.reason || '';
     const catReason = log.category?.reason || '';
-    const displayReason = brandReason || catReason || '';
+    const reasons = [];
+    if (brandReason) reasons.push('品牌: ' + brandReason);
+    if (catReason) reasons.push('分类: ' + catReason);
+    const displayReason = reasons.join(' | ') || '';
     const factors = log.factors || {};
     const entity = factors.entity || '';
     const modifiers = (factors.modifiers || []).join(', ');

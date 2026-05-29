@@ -225,17 +225,42 @@ def detect_scene_l1s(code_paths: dict, all_l1: set) -> set:
 # 路径去重 / 最终选路
 # =========================================================================
 
+def _path_score(path: str) -> int:
+    """
+    L3 具体性评分（用于日期相同时的排序回退）。
+    越高越具体：
+      - L3 != L2 → +1000（真正的子分类）
+      - L3 纯字数（不含/） → +10/字
+      - L3 含 '/' → +50（复合品类）
+      - L1 == L2 → -800（收敛步骤的产物，L2 不是真实子分类）
+    """
+    parts = path.split(' > ')
+    if len(parts) < 3:
+        return 0
+    l1, l2, l3 = parts[0], parts[1], parts[2]
+    score = len(l3.replace('/', '')) * 10
+    if l3 != l2:
+        score += 1000
+    if l1 == l2:
+        score -= 800
+    if '/' in l3:
+        score += 50
+    return score
+
+
 def pick_final_path(paths: dict, scene_l1s: set) -> str:
     """
     从多个路径中选取最终的分类路径。
-    优先选非场景L1的路径，然后选日期最新的。
+    优先选非场景L1的路径，然后选日期最新，日期相同时选 L3 更具体的。
     """
     non_scene = {p: d for p, d in paths.items()
                  if p.split(' > ')[0] not in scene_l1s}
     if non_scene:
-        return max(non_scene.items(), key=lambda x: int(x[1]) if x[1] else 0)[0]
+        return max(non_scene.items(),
+                   key=lambda x: (int(x[1]) if x[1] else 0, _path_score(x[0])))[0]
     if paths:
-        return max(paths.items(), key=lambda x: int(x[1]) if x[1] else 0)[0]
+        return max(paths.items(),
+                   key=lambda x: (int(x[1]) if x[1] else 0, _path_score(x[0])))[0]
     return ''
 
 
@@ -572,13 +597,7 @@ def clean_paths(code_paths: dict) -> dict:
                 l3_b = sorted_l3s[j][0]
                 merge = (l3_a == l3_b or bool(token_set(l3_a) & token_set(l3_b)))
                 if not merge and (l3_a in l3_b or l3_b in l3_a):
-                    try:
-                        from ..core.embedding_matcher import is_l3_related
-                        merge = is_l3_related(l3_a, l3_b)
-                    except ImportError:
-                        merge = True
-                    except (OSError, ValueError, RuntimeError):
-                        merge = True
+                    merge = True
                 if merge:
                     l3_dedup[l3_a] = l3_b
                     kept = True

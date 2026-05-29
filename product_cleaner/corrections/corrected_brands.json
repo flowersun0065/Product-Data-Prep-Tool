@@ -625,5 +625,96 @@
     ],
     "count": 1,
     "corrected_at": "2026-05-11T16:34:51.131367"
+  },
+  "蒂安黑胡椒粒": {
+    "suggested": "蒂安黑胡椒粒",
+    "corrected_to": "蒂安",
+    "samples": [
+      {
+        "name": "蒂安黑胡椒粒46g 意大利进口",
+        "category": "粮油调味 > 为你推荐 > 进口食品",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-23T06:02:29.057870"
+  },
+  "Full": {
+    "suggested": "Full",
+    "corrected_to": "Full of Hope/希望树",
+    "samples": [
+      {
+        "name": "Full of Hope希望树除甲醛凝胶(升级版) 200g",
+        "category": "清凉季 > 清凉百货 > 除臭/除潮",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-23T06:03:39.941760"
+  },
+  "旺仔牛奶": {
+    "suggested": "旺仔牛奶",
+    "corrected_to": "旺仔",
+    "samples": [
+      {
+        "name": "旺仔牛奶 125ml*4盒",
+        "category": "乳品烘焙 > 常温奶/箱装 > 娃哈哈/旺仔",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-23T06:04:08.147607"
+  },
+  "亨氏番茄沙司": {
+    "suggested": "亨氏番茄沙司",
+    "corrected_to": "亨氏",
+    "samples": [
+      {
+        "name": "亨氏番茄沙司120g *3",
+        "category": "粮油调味 > 沙拉/调味酱 > 番茄/意面酱",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-23T06:04:21.492400"
+  },
+  "保丽净全": {
+    "suggested": "保丽净全",
+    "corrected_to": "保丽净",
+    "samples": [
+      {
+        "name": "保丽净全/半口假牙清洁片24片",
+        "category": "个护美妆 > 新品上架 > 新品上架",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-23T06:05:25.924594"
+  },
+  "傲昕原种泰和乌": {
+    "suggested": "傲昕原种泰和乌",
+    "corrected_to": "傲昕",
+    "samples": [
+      {
+        "name": "【地标名禽】傲昕散养原种泰和乌鸡整只700天 650g",
+        "category": "肉禽蛋 > 鸡/鸭/禽 > 整鸡/整鸭",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-23T06:08:57.198604"
+  },
+  "沙巴哇菠萝蜜干果": {
+    "suggested": "沙巴哇菠萝蜜干果",
+    "corrected_to": "沙巴哇",
+    "samples": [
+      {
+        "name": "沙巴哇菠萝蜜干果75g 越南进口",
+        "category": "零食冰淇淋 > 为你推荐 > 进口食品",
+        "code": ""
+      }
+    ],
+    "count": 1,
+    "corrected_at": "2026-05-29T02:21:00.308277"
   }
 }

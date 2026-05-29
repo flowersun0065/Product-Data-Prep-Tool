@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Workspace — Premium Timeline</title>
+<style>
+  /* 现代Agent基础全局变量 (适配暗色与亮色，默认精致深邃调) */
+  :root {
+    --bg-canvas: #09090b;
+    --panel: rgba(20, 20, 23, 0.6);
+    --panel-border: rgba(255, 255, 255, 0.06);
+    --panel-border-active: rgba(59, 130, 246, 0.4);
+    
+    --text-main: #f4f4f5;
+    --text-sub: #a1a1aa;
+    --text-muted: #52525b;
+    
+    --accent: #3b82f6;
+    --accent-glow: rgba(59, 130, 246, 0.15);
+    --green: #10b981;
+    --green-glow: rgba(16, 185, 129, 0.1);
+    --orange: #f59e0b;
+    --orange-glow: rgba(245, 158, 11, 0.1);
+    --red: #ef4444;
+    --red-glow: rgba(239, 68, 68, 0.1);
+    
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "SF Mono", JetBrains Mono, Menlo, monospace;
+    --radius-xl: 16px;
+    --radius-lg: 12px;
+    --radius-md: 8px;
+  }
+
+  body {
+    background: var(--bg-canvas);
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .pv-shell {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 60px 24px 120px;
+  }
+
+  /* 装饰背景网格 - 现代Agent特有的环境感 */
+  .pv-shell::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; right: 0; height: 100vh;
+    background-image: radial-gradient(rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 24px 24px;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .section-title {
+    margin: 56px 0 24px 0;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-title::after {
+    content: ""; flex: 1; height: 1px; background: rgba(255,255,255,0.05);
+  }
+
+  /* Timeline Container */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  /* 1. Drop Zone — 极简磨砂质感 */
+  .tl-drop {
+    border: 1px dashed var(--panel-border);
+    border-radius: var(--radius-xl);
+    padding: 48px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    background: var(--panel);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+  }
+  .tl-drop:hover {
+    border-color: var(--panel-border-active);
+    background: rgba(37, 99, 235, 0.02);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.02), 0 0 24px rgba(37, 99, 235, 0.04);
+  }
+  .tl-drop svg {
+    opacity: 0.6;
+    transition: transform 0.3s, opacity 0.3s;
+  }
+  .tl-drop:hover svg {
+    transform: translateY(-2px);
+    opacity: 1;
+    stroke: var(--accent);
+  }
+
+  /* 已上传文件的紧凑状态 */
+  .tl-drop.file-loaded {
+    padding: 16px 20px;
+    flex-direction: row;
+    justify-content: flex-start;
+    border-style: solid;
+    border-color: rgba(16, 185, 129, 0.2);
+    background: rgba(16, 185, 129, 0.02);
+  }
+
+  /* 2. Connector — 流动流线 */
+  .tl-connector {
+    display: flex;
+    padding: 0 0 0 31px;
+    height: 32px;
+  }
+  .tl-connector .line {
+    width: 2px;
+    background: rgba(255, 255, 255, 0.04);
+    position: relative;
+    overflow: hidden;
+  }
+  .tl-connector .line.done {
+    background: var(--green);
+    opacity: 0.4;
+  }
+  /* 正在进行时的流水光效动画 */
+  .tl-connector .line.active::after {
+    content: "";
+    position: absolute;
+    top: -100%; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(to bottom, transparent, var(--accent), transparent);
+    animation: flow-down 1.5s infinite linear;
+  }
+  @keyframes flow-down {
+    0% { top: -100%; }
+    100% { top: 100%; }
+  }
+
+  /* 3. Step Card — 浮雕悬浮卡片 */
+  .tl-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--panel-border);
+    background: var(--panel);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255,255,255,0.03);
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Active 状态卡片：带有高级感的扩散边缘发光 */
+  .tl-card.active {
+    border-color: var(--panel-border-active);
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15), 0 12px 36px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    position: relative;
+  }
+  /* 卡片上方的扫描线动效 */
+  .tl-card.active::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: scan-width 2s infinite linear;
+  }
+  @keyframes scan-width {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .tl-card.done {
+    opacity: 0.85;
+  }
+
+  .tl-card-hdr {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+  }
+
+  /* Status Dots */
+  .tl-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background: var(--text-muted);
+    position: relative;
+    transition: all 0.3s;
+  }
+  .tl-card.done .tl-dot {
+    background: var(--green);
+    box-shadow: 0 0 12px var(--green);
+  }
+  .tl-card.active .tl-dot {
+    background: var(--accent);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+  }
+  /* 等待态 */
+  .tl-card.pending .tl-dot {
+    background: transparent;
+    border: 1px solid var(--text-muted);
+  }
+
+  .tl-title {
+    flex: 1; font-size: 14px; font-weight: 500; color: var(--text-muted);
+    transition: color 0.3s;
+  }
+  .tl-card.done .tl-title { color: var(--text-sub); }
+  .tl-card.active .tl-title { color: var(--text-main); font-weight: 600; }
+
+  .tl-time {
+    font-size: 12px; font-family: var(--font-mono); color: var(--text-muted);
+    background: rgba(255,255,255,0.02); padding: 2px 8px; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+  .tl-card.done .tl-time { color: var(--green); background: rgba(16, 185, 129, 0.04); border-color: rgba(16, 185, 129, 0.1); }
+  .tl-card.active .tl-time { color: var(--accent); background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.15); animation: pulse-opacity 2s infinite; }
+  
+  @keyframes pulse-opacity {
+    0%, 100% { opacity: 0.6; } 50% { opacity: 1; }
+  }
+
+  /* 4. Collapsible Body — smooth expand/collapse via max-height */
+  .tl-card.done .tl-body, .tl-card.active .tl-body {
+    max-height: 500px; opacity: 1;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease 0.1s, padding 0.35s ease;
+  }
+  .tl-card.done .tl-body { padding: 18px 24px 20px 48px; }
+  .tl-card.active .tl-body { padding: 14px 24px 14px 48px; }
+  .tl-body {
+    border-top: 1px solid rgba(255, 255, 255, 0.03);
+    font-size: 13px; color: var(--text-sub); line-height: 1.6;
+    background: rgba(0,0,0,0.1);
+    max-height: 0; opacity: 0; overflow: hidden;
+    padding: 0 24px 0 48px;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, padding 0.25s ease;
+  }
+
+  /* Typewriter log lines */
+  .tl-log { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); line-height: 1.8; }
+  .tl-log .log-line { animation: fade-up 0.3s ease forwards; }
+  @keyframes fade-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .tl-log .cursor::after {
+    content: "\25C6"; color: var(--accent); animation: blink 1s step-end infinite; margin-left: 3px; font-size: 10px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Metadata Key-Values */
+  .tl-body .kv { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+  .tl-body .kv .item { display: inline-flex; align-items: center; gap: 8px; }
+  .tl-body .kv .k { color: var(--text-muted); font-size: 12px; }
+  .tl-body .kv .v { color: var(--text-main); font-weight: 500; font-family: var(--font-mono); }
+
+  /* Premium Badges - 降低饱和度，提高内发光质感 */
+  .tl-body .mini-tag {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px; border-radius: var(--radius-md); font-size: 12px; font-weight: 500;
+    border: 1px solid transparent; margin-right: 6px; margin-bottom: 6px;
+  }
+  .tl-body .mini-tag.grn { background: var(--green-glow); color: #34d399; border-color: rgba(16, 185, 129, 0.15); }
+  .tl-body .mini-tag.org { background: var(--orange-glow); color: #fbbf24; border-color: rgba(245, 158, 11, 0.15); }
+  .tl-body .mini-tag.red { background: var(--red-glow); color: #f87171; border-color: rgba(239, 68, 68, 0.15); }
+  .tl-body .mini-tag.acc { background: var(--accent-glow); color: #60a5fa; border-color: rgba(59, 130, 246, 0.15); }
+
+  /* 5. Action Area */
+  .tl-action { padding: 16px 0 0 48px; display: flex; align-items: center; gap: 16px; }
+  
+  .btn-primary {
+    background: var(--text-main); color: var(--bg-canvas);
+    border: none; padding: 10px 24px; border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+    box-shadow: 0 4px 12px rgba(255,255,255,0.05);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px); opacity: 0.95;
+  }
+  .btn-primary:active { transform: translateY(0); }
+
+</style>
+</head>
+<body>
+
+<div class="pv-shell">
+
+  <div class="section-title">Agent Process · 执行中状态</div>
+  
+  <div class="timeline">
+
+    <div class="tl-drop">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-sub)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      <div>
+        <span style="font-size:14px; font-weight:500; color:var(--text-main);">投喂诊断文件</span>
+        <span style="display:block; font-size:12px; color:var(--text-muted); margin-top:4px;">拖拽 .xlsx / .xls 到此处，或点击浏览</span>
+      </div>
+    </div>
+
+    <div class="tl-connector"><div class="line done"></div></div>
+
+    <div class="tl-card done">
+      <div class="tl-card-hdr">
+        <div class="tl-dot"></div>
+        <span class="tl-title">读取源数据</span>
+        <span class="tl-time">1.2s</span>
+      </div>
+      <div class="tl-body">
+        <div class="kv">
+          <div class="item"><span class="k">File</span><span class="v">线上_TaskID-54.xlsx</span></div>
+          <div class="item"><span class="k">Rows</span><span class="v">1,247</span></div>
+          <div class="item"><span class="k">Size</span><span class="v">256.3 KB</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tl-connector"><div class="line done"></div></div>
+
+    <div class="tl-card done">
+      <div class="tl-card-hdr">
+        <div class="tl-dot"></div>
+        <span class="tl-title">知识库关联 & 品牌分析</span>
+        <span class="tl-time">38.5s</span>
+      </div>
+      <div class="tl-body">
+        <div style="margin-bottom:8px;">
+          <span class="mini-tag grn">已确立 892</span>
+          <span class="mini-tag org">缺失项 203</span>
+          <span class="mini-tag red">异常冲突 89</span>
+        </div>
+        <span style="font-size:12px; color:var(--text-muted);">Agent 已自动聚类收敛出 89 个标准品牌簇</span>
+      </div>
+    </div>
+
+    <div class="tl-connector"><div class="line active"></div></div>
+
+    <div class="tl-card active" id="activeStepDemo">
+      <div class="tl-card-hdr">
+        <div class="tl-dot"></div>
+        <span class="tl-title">多级分类归集与映射</span>
+        <span class="tl-time">正在思考...</span>
+      </div>
+      <div class="tl-body">
+        <div class="tl-log" id="typewriterLog">
+          <div class="log-line" style="animation-delay:0s;">→ 扫描 Code 列，提取有效路径...</div>
+          <div class="log-line" style="animation-delay:0.6s;">→ 匹配标准分类层级 (L1/L2/L3)...</div>
+          <div class="log-line" style="animation-delay:1.2s;">→ 识别营销文案节点 156 个，分离至营销标签</div>
+          <div class="log-line" style="animation-delay:1.8s;">→ 合并相似路径，由 47 条收敛至 23 条</div>
+          <div class="log-line cursor" style="animation-delay:2.4s;">→ 生成分类建议映射表</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tl-connector"><div class="line"></div></div>
+
+    <div class="tl-card pending">
+      <div class="tl-card-hdr">
+        <div class="tl-dot"></div>
+        <span class="tl-title">多维数据精简 & 路由输出</span>
+        <span class="tl-time" style="color:var(--text-muted); opacity:0.5;">Waiting</span>
+      </div>
+    </div>
+
+  </div>
+
+
+
+  <div class="section-title">Agent Process · 运行结束状态</div>
+
+  <div class="timeline">
+
+    <div class="tl-drop file-loaded">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 1;">
+        <path d="M20 6L9 17l-5-5"/>
+      </svg>
+      <span style="font-size:13px; font-weight:500; color:var(--text-main);">线上_TaskID-54.xlsx</span>
+      <span style="font-size:12px; color:var(--text-muted); margin-left: auto;">1,247 行 · 已就绪</span>
+    </div>
+
+    <div class="tl-connector"><div class="line done"></div></div>
+
+    <div class="tl-card done">
+      <div class="tl-card-hdr">
+        <div class="tl-dot"></div><span class="tl-title">读取源数据</span><span class="tl-time">1.2s</span>
+      </div>
+    </div>
+
+    <div class="tl-connector"><div class="line done"></div></div>
+
+    <div class="tl-card done">
+      <div class="tl-card-hdr">
+        <div class="tl-dot"></div><span class="tl-title">知识库关联 & 品牌分析</span><span class="tl-time">38.5s</span>
+      </div>
+    </div>
+
+    <div class="tl-connector"><div class="line done"></div></div>
+
+    <div class="tl-card done">
+      <div class="tl-card-hdr">
+        <div class="tl-dot"></div><span class="tl-title">多级分类归集与映射</span><span class="tl-time">5.8s</span>
+      </div>
+      <div class="tl-body">
+        <div style="margin-bottom:4px;">
+          <span class="mini-tag acc">23 条标准路径</span>
+          <span class="mini-tag org">12 待人工确认</span>
+          <span class="mini-tag grn">156 自动化营销标签</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tl-connector"><div class="line done"></div></div>
+
+    <div class="tl-card done">
+      <div class="tl-card-hdr">
+        <div class="tl-dot"></div><span class="tl-title">多维数据精简 & 路由输出</span><span class="tl-time">0.8s</span>
+      </div>
+      <div class="tl-body">
+        <span style="font-size:12px; color:var(--text-muted);">Pipeline 整体耗时 <span style="color:var(--text-main); font-weight:600; font-family:var(--font-mono)">46.3s</span>，结果集已打包完毕。</span>
+      </div>
+    </div>
+
+    <div class="tl-action">
+      <button class="btn btn-primary">进入诊断工作台</button>
+      <span style="font-size:12px; color:var(--text-muted);">统计详情及明细已推入右侧边栏</span>
+    </div>
+
+  </div>
+
+</div>
+
+
+
+</body>
+</html>

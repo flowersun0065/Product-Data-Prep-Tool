@@ -32,6 +32,15 @@
     "type": "肉制品",
     "country": "CN"
   },
+  "农夫山泉": {
+    "aliases": [
+      "农夫山泉",
+      "NONGFU SPRING",
+      "农夫"
+    ],
+    "type": "饮水",
+    "country": "CN"
+  },
   "好时": {
     "aliases": [
       "好时",
@@ -59,6 +68,14 @@
       "盒马X朱光玉火锅馆"
     ],
     "type": "火锅",
+    "country": "CN"
+  },
+  "百威": {
+    "aliases": [
+      "百威",
+      "百威啤酒"
+    ],
+    "type": "酒类",
     "country": "CN"
   },
   "皮爷": {
@@ -104,20 +121,5 @@
     ],
     "type": "日化",
     "country": "US"
-  },
-  "百威": {
-    "aliases": [
-      "百威",
-      "百威啤酒"
-    ],
-    "type": "酒类",
-    "country": "CN"
-  },
-  "塞翁福": {
-    "aliases": [
-      "塞翁福"
-    ],
-    "type": "干货",
-    "country": "CN"
   }
 }

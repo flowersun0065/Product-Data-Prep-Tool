@@ -78,17 +78,17 @@ function handleUploadResponse(data) {
     if (data.async) {
         document.getElementById('uploadMsg').textContent = '⏳ ' + data.message;
         document.getElementById('uploadSection').classList.add('hidden');
-        document.getElementById('diagnosisSection').classList.remove('hidden');
+        var _ds=document.getElementById('diagnosisSection');if(_ds)_ds.classList.remove('hidden');
         document.getElementById('progressSection').classList.remove('hidden');
         document.getElementById('statsSection').classList.add('opacity-50');
         document.getElementById('progressText').textContent = data.message;
-        pollDiagnosisStatus();
+        if (!window._electronMode) pollDiagnosisStatus();
     } else {
         diagnosisData = data.diagnosis;
         document.getElementById('uploadSection').classList.add('hidden');
-        document.getElementById('diagnosisSection').classList.remove('hidden');
+        var _ds=document.getElementById('diagnosisSection');if(_ds)_ds.classList.remove('hidden');
         document.getElementById('progressSection').classList.add('hidden');
-        showDiagnosis(data);
+        if (!window._electronMode) showDiagnosis(data);
     }
     loadRecentFiles(); // 刷新列表
 }
@@ -245,6 +245,7 @@ async function loadRecentFiles() {
 
 // 导入已有文件
 async function importRecentFile(fileId) {
+    if (window._electronMode) return; // electron handles history via timeline
     if (!confirm('是否导入该历史文件并重新开始诊断？')) return;
     
     document.getElementById('uploadMsg').textContent = '⏳ 正在初始化导入...';
@@ -262,7 +263,7 @@ async function importRecentFile(fileId) {
         sessionId = data.session_id;
         localStorage.setItem('last_session_id', sessionId);
         document.getElementById('uploadSection').classList.add('hidden');
-        document.getElementById('diagnosisSection').classList.remove('hidden');
+        var _ds=document.getElementById('diagnosisSection');if(_ds)_ds.classList.remove('hidden');
         document.getElementById('progressSection').classList.remove('hidden');
         document.getElementById('statsSection').classList.add('opacity-50');
         document.getElementById('progressText').textContent = data.message;
@@ -275,6 +276,7 @@ async function importRecentFile(fileId) {
 
 // 页面加载后尝试恢复上次 session
 async function tryRestoreSession() {
+    if (window._electronMode) return; // electron handles its own restore
     const saved = localStorage.getItem('last_session_id');
     if (!saved) { console.log('tryRestoreSession: 无 last_session_id'); return; }
 
@@ -302,7 +304,7 @@ async function tryRestoreSession() {
                 if (resultData.success && resultData.diagnosis && resultData.diagnosis.brand_clusters) {
                     diagnosisData = resultData.diagnosis;
                     document.getElementById('uploadSection').classList.add('hidden');
-                    document.getElementById('diagnosisSection').classList.remove('hidden');
+                    var _ds=document.getElementById('diagnosisSection');if(_ds)_ds.classList.remove('hidden');
                     document.getElementById('progressSection').classList.add('hidden');
                     showDiagnosis(resultData);
                     return;
@@ -314,7 +316,7 @@ async function tryRestoreSession() {
             localStorage.removeItem('last_session_id');
         } else if (d.status === 'processing') {
             document.getElementById('uploadSection').classList.add('hidden');
-            document.getElementById('diagnosisSection').classList.remove('hidden');
+            var _ds=document.getElementById('diagnosisSection');if(_ds)_ds.classList.remove('hidden');
             document.getElementById('progressSection').classList.remove('hidden');
             document.getElementById('statsSection').classList.add('opacity-50');
             pollDiagnosisStatus();

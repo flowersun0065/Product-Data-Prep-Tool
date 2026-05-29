@@ -1385,6 +1385,15 @@ BRAND_DATABASE_V6 = {
     '清风': {'aliases': ['清风'], 'type': '未知', 'country': 'CN'},
     '象大厨': {'aliases': ['象大厨'], 'type': '熟食', 'country': 'CN'},
     '象小家': {'aliases': ['象小家'], 'type': '日化', 'country': 'CN'},
+    '云山半': {'aliases': ['云山半'], 'type': '调味', 'country': 'CN'},
+    '塞翁福': {'aliases': ['塞翁福'], 'type': '干货', 'country': 'CN'},
+    '香其': {'aliases': ['香其'], 'type': '调味', 'country': 'CN'},
+    '龙和宽': {'aliases': ['龙和宽'], 'type': '调味', 'country': 'CN'},
+    '保丽净': {'aliases': ['保丽净'], 'type': '美妆', 'country': 'CN'},
+    '傲昕': {'aliases': ['傲昕'], 'type': '肉禽蛋', 'country': 'CN'},
+    '唐人神': {'aliases': ['唐人神'], 'type': '干货', 'country': 'CN'},
+    '沙巴哇': {'aliases': ['沙巴哇'], 'type': '零食', 'country': 'CN'},
+    '温佩兹': {'aliases': ['温佩兹'], 'type': '日化', 'country': 'CN'},
 }
 
 
@@ -1409,6 +1418,18 @@ def _atomic_json_save(filepath: Path, data):
     with open(tmp, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     os.replace(str(tmp), str(filepath))
+
+def remove_brand(brand_name: str):
+    """从数据库删除品牌（BRAND_DATABASE_V6 + dynamic_brands.json）"""
+    if brand_name in BRAND_DATABASE_V6:
+        del BRAND_DATABASE_V6[brand_name]
+    with _save_lock:
+        dynamic_brands = load_dynamic_brands()
+        if brand_name in dynamic_brands:
+            del dynamic_brands[brand_name]
+            _atomic_json_save(DYNAMIC_BRANDS_FILE, dynamic_brands)
+    _build_brand_indexes()
+
 
 def save_dynamic_brand(brand_name: str, brand_info: dict):
     """保存单个动态品牌到 JSON 文件"""

@@ -150,10 +150,12 @@ async function showDiagnosis(data) {
     diagnosisData = data.diagnosis;
     window.diagnosisData = data.diagnosis;
 
-    // 隐藏进度区域，显示结果区域
-    document.getElementById('progressSection').classList.add('hidden');
-    document.getElementById('statsSection').classList.remove('hidden');
-    document.getElementById('diagnosisSection').classList.remove('hidden');
+    // 隐藏进度区域，显示结果区域 (electron: timeline handles its own UI)
+    if (!window._electronMode) {
+      document.getElementById('progressSection').classList.add('hidden');
+      document.getElementById('statsSection').classList.remove('hidden');
+      document.getElementById('diagnosisSection').classList.remove('hidden');
+    }
     
     const stats = data.stats;
     document.getElementById('statTotal').textContent = stats.total || 0;
@@ -203,10 +205,12 @@ const MISSING_PER_PAGE = 20;
 
 function renderCategoryGroups(diagnosis) {
     const cateCountSpan = document.getElementById('cateCount');
-    const allCodes = diagnosis.all_codes || [];
-    const total = allCodes.length;
-    const confirmed = allCodes.filter(c => window.categoryRules[c.code]).length;
-    cateCountSpan.textContent = `共 ${total} 个商品，已处理 ${confirmed}/${total}`;
+    if (cateCountSpan) {
+      const allCodes = diagnosis.all_codes || [];
+      const total = allCodes.length;
+      const confirmed = allCodes.filter(c => window.categoryRules[c.code]).length;
+      cateCountSpan.textContent = `共 ${total} 个商品，已处理 ${confirmed}/${total}`;
+    }
 
     renderCategoryTree(diagnosis);
     renderMissingItems(diagnosis.missing_items || []);
@@ -844,6 +848,10 @@ function openCategorySidePanel(type, idx, containerId) {
 
 function renderCategoryPanelContent() {
     if (!window.currentPanelData || window.currentPanelData.type !== 'category') return;
+    if (window._electronMode && typeof window._emRefreshCategoryPanel === 'function') {
+        window._emRefreshCategoryPanel();
+        return;
+    }
     const items = window.currentPanelData.items;
     const listContainer = document.getElementById('panelItemsList');
     const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
@@ -1345,9 +1353,13 @@ function openUnifiedCategoryPanel(path) {
     };
     window.currentPanelPage = 1;
     document.getElementById('sidePanelTitle').textContent = `分类商品: ${path} (共${info.count}条)`;
-    renderCategoryPanelContent();
-    document.getElementById('sidePanelOverlay').classList.add('open');
-    document.getElementById('sidePanel').classList.add('open');
+    if (window._electronMode && typeof window._emOpenCategoryProductList === 'function') {
+        window._emOpenCategoryProductList(path, info);
+    } else {
+        renderCategoryPanelContent();
+        document.getElementById('sidePanelOverlay').classList.add('open');
+        document.getElementById('sidePanel').classList.add('open');
+    }
 }
 
 async function batchMarkAllAsMarketing() {
@@ -1395,6 +1407,7 @@ window.renderGlobalCategoryTree = renderGlobalCategoryTree;
 window.filterGlobalCategoryTree = filterGlobalCategoryTree;
 window.openUnifiedCategoryPanel = openUnifiedCategoryPanel;
 window.openCategoryPickerForBatch = openCategoryPickerForBatch;
+window.openCategoryPicker = openCategoryPicker;
 window.batchMarkAllAsMarketing = batchMarkAllAsMarketing;
 window.toggleMarketingInTree = toggleMarketingInTree;
 window.batchClassifyPath = batchClassifyPath;

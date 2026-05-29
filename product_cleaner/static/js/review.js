@@ -11,7 +11,7 @@ const R = {
 };
 
 function init() {
-    const params = new URLSearchParams(window.location.search);
+    var params = new URLSearchParams(window.location.search);
     R.sid = params.get('sid');
     if (!R.sid) {
         document.getElementById('loadingMsg').innerHTML = '<p class="text-red-400">缺少 session ID，请从处理页面打开</p>';
@@ -24,9 +24,9 @@ function init() {
     startPolling();
 
     // 筛选按钮事件
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.filter-btn').forEach(b => {
+    document.querySelectorAll('.filter-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn').forEach(function(b) {
                 b.className = 'filter-btn px-3 py-1 rounded text-xs bg-slate-700 text-slate-300';
             });
             btn.className = 'filter-btn px-3 py-1 rounded text-xs bg-cyan-600 text-white';
@@ -450,20 +450,4 @@ function categoryStatusLabel(status) {
     return map[status] || status || '';
 }
 
-// 入口
 document.addEventListener('DOMContentLoaded', init);
-
-// Override local selectItem to use shared detail panel
-if (typeof openDetail !== 'undefined') {
-    var _selectItem = selectItem;
-    selectItem = function(code) {
-        var item = R.filtered.find(function(d) { return d.code === code; });
-        if (item) {
-            R.selectedCode = code;
-            renderList();
-            openDetail(item);
-            var placeholder = document.getElementById('detailPlaceholder');
-            if (placeholder) placeholder.classList.remove('hidden');
-        }
-    };
-}

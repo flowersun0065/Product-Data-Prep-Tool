@@ -6,6 +6,9 @@
 供 brand_cluster, category_detector, brand_checker 等模块导入。
 """
 
+import json
+import os
+
 # 非品牌描述词分类（用于实体法去噪）
 SIZE_PREFIXES = {'大', '小', '中', '高', '矮', '胖', '瘦', '细', '粗', '长', '短'}
 
@@ -141,10 +144,10 @@ NOT_BRAND_CATEGORIES = {
     'variety': {
         '虾': {
             '斑节虾', '罗氏沼虾', '黑虎虾', '基围虾', '大明虾', '白米虾',
-            '北极甜虾', '皮皮虾', '大龙虾', '波士顿龙虾', '澳龙', '波龙', '小青龙', '龙虾',
+            '北极甜虾', '皮皮虾', '大龙虾', '波士顿龙虾', '澳龙', '波龙', '小青龙', 
             '黑金刚', '对虾','龙虾',
             '滑皮虾','黑虎青虾滑','飞鱼籽虾滑','大青虾仁','翡翠白虾仁',
-            '南美白虾','小河虾', '凤尾虾', '白虾', '凤尾','小龙虾尾', '虾滑', '虾尾','凤尾虾',
+            '南美白虾','小河虾', '凤尾虾', '白虾','小龙虾尾', '虾滑', '虾尾','小龙虾',
         },
         '蟹': {
             '梭子蟹', '红膏梭子蟹', '三门青蟹', '青蟹', '雪蟹', '帝王蟹',
@@ -419,8 +422,7 @@ NOT_BRAND_CATEGORIES = {
             '半鸡', '干果', '夹心', '草原', 
             '鲜鸡块', '神鲜桶', '小馄饨', '纸皮烧麦',
             '煲仔饭', '砂锅粥', '肠粉', '饺子', '馄饨', '包子', '馒头', '石锅', '紫苏脆骨', '加州卷', '小笼包','杂粮', '手抓饼',
-            '三明治', '龙虾片', '炒年糕','瑞士卷','面包', '可颂', 
-            '汤',
+            '三明治', '龙虾片', '炒年糕',
             '番茄炒蛋','鸡公煲', '腊肠',
             '鸡蛋卷', '肉酱', '培根',
             '老婆饼','麻薯',
@@ -428,6 +430,8 @@ NOT_BRAND_CATEGORIES = {
         },
         '烘焙/调料': {
              '黄油', '奶油', '奶酪', '起酥油','亚麻籽','黑椒','黑胡椒', '巧克力', '葱油', '芝士','海盐', '生巧',  '胡椒','米蛋糕',
+             '瑞士卷','面包', '可颂', '可颂', '吐司',
+             '汤',
         },
         
         
@@ -528,6 +532,56 @@ NOT_BRAND_CATEGORIES = {
     },
 }
 
+# 词库 JSON 持久化：统一两层分组结构（分组 → 词条），JSON 为权威数据源
+_LEXICON_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', 'brands', 'lexicon_words.json')
+
+def _load_lexicon_words():
+    try:
+        with open(_LEXICON_JSON_PATH, 'r', encoding='utf-8') as f:
+            json_data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        json_data = None
+
+    # 构建种子：统一为 {subgroup: [words]} 结构
+    seed = {}
+    for cat_name, cat_val in NOT_BRAND_CATEGORIES.items():
+        if isinstance(cat_val, dict):
+            seed[cat_name] = {k: sorted(list(v)) for k, v in cat_val.items()}
+        elif isinstance(cat_val, set):
+            seed[cat_name] = {'默认': sorted(list(cat_val))}
+
+    if json_data is None:
+        os.makedirs(os.path.dirname(_LEXICON_JSON_PATH), exist_ok=True)
+        try:
+            with open(_LEXICON_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(seed, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+        json_data = seed
+
+    # 应用到 NOT_BRAND_CATEGORIES：统一转为 {subgroup: set}
+    for cat_name in list(NOT_BRAND_CATEGORIES.keys()):
+        if cat_name in json_data:
+            json_val = json_data[cat_name]
+            result = {}
+            if isinstance(json_val, dict):
+                for subgroup, words in json_val.items():
+                    result[subgroup] = set(words) if isinstance(words, list) else set()
+            elif isinstance(json_val, list):
+                # 兼容旧格式（flat list）→ 包进默认分组
+                result['默认'] = set(json_val)
+            # 合并硬编码中新增的 subgroup
+            hardcoded = NOT_BRAND_CATEGORIES[cat_name]
+            if isinstance(hardcoded, dict):
+                for subgroup, words in hardcoded.items():
+                    if subgroup not in result:
+                        result[subgroup] = set(words)
+            elif isinstance(hardcoded, set) and '默认' not in result:
+                result['默认'] = set(hardcoded)
+            NOT_BRAND_CATEGORIES[cat_name] = result
+
+_load_lexicon_words()
+
 # 拼接为快速查找集合
 NOT_BRAND_WORDS = set()
 for cat_words in NOT_BRAND_CATEGORIES.values():
@@ -588,7 +642,7 @@ WEIGHT_UNITS_PATTERN = '(?:' + '|'.join(WEIGHT_UNITS) + ')'
 
 # ===== 计价/包装规格（供 product_parser 区分提取）=====
 PACK_UNITS = (
-    '只', '个', '盒', '袋', '瓶', '罐', '包', '条', '支', '桶', '箱',
+    '只', '个', '盒', '袋', '瓶', '罐', '包', '条', '支', '桶', '箱','听',
     '片', '块', '份', '杯', '粒', '枚', '头', '串', '棵', '根', '瓣', '圈', '双', '件',
 )
 PACK_UNITS_PATTERN = '(?:' + '|'.join(PACK_UNITS) + ')'

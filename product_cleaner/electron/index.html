@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>产品数据清洗工具</title>
+<link rel="stylesheet" href="/static/css/native.css">
+<link rel="stylesheet" href="/electron/css/bat.css">
+<link rel="stylesheet" href="/electron/css/agent.css">
+</head>
+<body>
+
+<!-- ═══ Sidebar ═══ -->
+<aside class="island-panel sidebar" id="electronSidebar">
+  <div class="sidebar-top">
+    <div class="window-controls">
+      <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
+      <div class="sidebar-toggle-btn" id="sidebarCollapseBtn" title="收起导航">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 3v18"></path></svg>
+      </div>
+    </div>
+
+    <div class="sidebar-tabs-container" id="sidebarTabs">
+      <div class="sidebar-tab-item active" data-tab="workflow">工作流</div>
+      <div class="sidebar-tab-item" data-tab="agent">Agent</div>
+    </div>
+
+    <!-- Workflow pane -->
+    <div class="sidebar-pane active" id="paneWorkflow">
+      <div class="group-select-row">
+        <select class="group-select" id="electronGroupSelect" onchange="electronSwitchGroup(this.value)"><option value="">-- 选择分组 --</option></select>
+        <button class="group-select-add" onclick="showGroupManager()" title="新建分组">+</button>
+      </div>
+      <div class="menu-item" style="margin-bottom:4px;" onclick="_newSession()">
+          <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+          <span>新建会话</span>
+        </div>
+      <div class="nav-section">
+        <div class="section-title">工作流视图</div>
+        <div class="nav-item" data-step="upload"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>上传 & 诊断</span></div>
+        <div class="nav-item" data-step="brand-review"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>品牌审核</span></div>
+        <div class="nav-item" data-step="category-review"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>分类审核</span></div>
+        <div class="nav-item" data-step="ai-process"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>AI 处理</span></div>
+        <div class="nav-item" data-step="review"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>复核</span></div>
+        <div class="nav-item" data-step="export"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>导出</span></div>
+      </div>
+      <div class="nav-section"><div class="section-title">品牌库</div>
+        <div class="nav-item" data-page="brand-database"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>品牌数据库</span></div>
+        <div class="nav-item" data-page="brand-corrections"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>品牌修正记录</span></div>
+        <div class="nav-item" data-page="variety-words"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>词库管理</span></div>
+      </div>
+      <div class="nav-section"><div class="section-title">分类体系</div>
+        <div class="nav-item" data-page="category-tree"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>分类路径树</span></div>
+        <div class="nav-item" data-page="category-classify"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>路径分类标记</span></div>
+      </div>
+      <div class="nav-section"><div class="section-title">历史会话</div><div id="electronHistory"></div></div>
+    </div>
+
+    <!-- Agent pane -->
+    <div class="sidebar-pane" id="paneAgent">
+      <div class="menu-group" id="agentMenuGroup">
+        <div class="menu-item" id="agentNewSession" onclick="_newSession()">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          <span>New session</span>
+        </div>
+      </div>
+      <div class="nav-section"><div class="section-title">历史对话</div><div id="agentHistory"></div></div>
+    </div>
+  </div>
+  <div class="sidebar-bottom"><span id="electronSettingsBtn" style="cursor:pointer;">设置</span></div>
+</aside>
+
+<!-- ═══ Main Area ═══ -->
+<main class="main-area" id="electronMainContent">
+	<div id="workflowMain">
+  <div class="top-action-bar">
+    <div class="canvas-toggle-btn" id="sidebarExpandBtn" title="展开导航">
+      <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    </div>
+    <div class="breadcrumb">
+      <span id="breadcrumbStep">上传 & 诊断</span>
+      <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+      <span id="breadcrumbGroup" style="color:var(--text-muted);">选择分组</span>
+      <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+      <span style="position:relative;">
+        <span id="breadcrumbSession" class="session-dropdown" onclick="toggleSessionMenu()" style="color:var(--text-main);font-weight:500;">选择会话</span>
+        <div class="context-menu" id="sessionMenu"></div>
+      </span>
+    </div>
+  </div>
+
+  <!-- ═══ Agent Timeline ═══ -->
+      <div class="timeline" id="agentTimeline">
+
+        <!-- Trigger: drop zone -->
+        <div class="tl-drop" id="tlDrop" data-bat-tip="点击或拖拽上传诊断文件，我会自动分析品牌和分类" onclick="document.getElementById('fileInput').click()">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-sub)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          <div>
+            <span style="font-size:14px;font-weight:500;color:var(--text-main);">投喂诊断文件</span>
+            <span style="display:block;font-size:12px;color:var(--text-muted);margin-top:4px;">拖拽 .xlsx / .xls 到此处，或点击浏览</span>
+          </div>
+        </div>
+
+        <!-- Hidden stubs: old web DOM hooks (prevent crashes in shared JS) -->
+        <div id="uploadSection" class="hidden"></div>
+        <div id="progressSection" class="hidden"></div>
+        <span id="missingCount" style="display:none;"></span>
+        <span id="mismatchCount" style="display:none;"></span>
+        <span id="validCount" style="display:none;"></span>
+        <span id="unbrandedCount" style="display:none;"></span>
+        <div id="missingGroups" style="display:none;"></div>
+        <div id="mismatchGroups" style="display:none;"></div>
+        <div id="validGroups" style="display:none;"></div>
+        <div id="unbrandedGroups" style="display:none;"></div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
+        <input type="hidden" id="uploadGroup" value="">
+        <div id="fileName" style="display:none;"></div>
+        <div id="uploadMsg" style="display:none;"></div>
+        <span id="progressText" style="display:none;"></span>
+        <button id="uploadBtn" onclick="uploadFile()" class="hidden" disabled></button>
+
+        <!-- Step 1: 读取源数据 -->
+        <div class="tl-connector" id="connRead" style="display:none;"><div class="line"></div></div>
+        <div class="tl-card pending" id="cardRead" style="display:none;">
+          <div class="tl-card-hdr"><div class="tl-dot"></div><span class="tl-title">读取源数据</span><span class="tl-time" id="timeRead">Waiting</span></div>
+          <div class="tl-body"><div class="kv" id="kvRead"></div></div>
+        </div>
+
+        <!-- Step 2: 知识库关联 & 品牌分析 -->
+        <div class="tl-connector" id="connBrand" style="display:none;"><div class="line"></div></div>
+        <div class="tl-card pending" id="cardBrand" style="display:none;">
+          <div class="tl-card-hdr"><div class="tl-dot"></div><span class="tl-title">品牌库关联 & 品牌分析</span><span class="tl-time" id="timeBrand">Waiting</span></div>
+          <div class="tl-body"><div class="tl-log" id="logBrand"></div></div>
+        </div>
+
+        <!-- Step 3: 多级分类归集与映射 -->
+        <div class="tl-connector" id="connCate" style="display:none;"><div class="line"></div></div>
+        <div class="tl-card pending" id="cardCate" style="display:none;">
+          <div class="tl-card-hdr"><div class="tl-dot"></div><span class="tl-title">多级分类归集与映射</span><span class="tl-time" id="timeCate">Waiting</span></div>
+          <div class="tl-body"><div class="tl-log" id="logCate"></div></div>
+        </div>
+
+        <!-- Step 4: 数据精简 & 路由输出 -->
+        <div class="tl-connector" id="connFinish" style="display:none;"><div class="line"></div></div>
+        <div class="tl-card pending" id="cardFinish" style="display:none;">
+          <div class="tl-card-hdr"><div class="tl-dot"></div><span class="tl-title">数据精简 & 路由输出</span><span class="tl-time" id="timeFinish">Waiting</span></div>
+          <div class="tl-body"><div class="tl-log" id="logFinish"></div></div>
+        </div>
+
+        <!-- CTA -->
+        <div class="tl-action" id="tlAction" data-bat-tip="诊断完成后从这里进入 AI 处理" style="display:none;">
+          <button class="btn btn-primary" style="font-size:13px;padding:10px 22px;font-weight:600;" id="tlViewResultsBtn">查看诊断结果</button>
+          <button class="btn-agent secondary" style="font-size:13px;padding:10px 22px;" id="tlNewBrandsBtn" onclick="(function(){var nb=window.newBrands||[];if(!nb.length){alert('没有发现新品牌，请先完成数据诊断');return;}if(typeof updateNewBrandsDisplay==='function')updateNewBrandsDisplay();})();">新品牌发现 <span id="newBrandsCount">0</span></button>
+
+        </div>
+      </div>
+
+      <!-- ═══ Stats Panel — Agent Diagnosis Card ═══ -->
+      <div id="statsSection" class="hidden">
+        <div class="agent-panel" style="padding:24px;display:flex;flex-direction:column;gap:0;">
+          <!-- Header -->
+          <div class="ap-header">
+            <h3 class="ap-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              诊断统计看板
+            </h3>
+            <p class="ap-sub" id="statsFileName">数据源：--</p>
+          </div>
+
+          <!-- Section: Brand -->
+          <div class="ap-group-title">品牌分析诊断明细</div>
+          <div class="ap-stat-grid">
+            <!-- Full-width: brand clusters -->
+            <div class="ap-card ap-card-full">
+              <div class="ap-card-label">
+                <span class="ap-dot acc"></span>
+                <span>总商品数</span>
+              </div>
+              <div class="ap-card-value"><span id="statTotal">-</span> <span class="ap-unit">个商品行</span></div>
+            </div>
+            <!-- 2x2 grid -->
+            <div class="ap-card">
+              <div class="ap-card-label">正确项</div>
+              <div class="ap-card-value" style="color:#34d399;" id="statValid">-</div>
+              <div><span class="ap-badge grn">无需处理</span></div>
+            </div>
+            <div class="ap-card">
+              <div class="ap-card-label">缺失项</div>
+              <div class="ap-card-value" style="color:#fbbf24;" id="statBrandMissing">-</div>
+              <div><span class="ap-badge org">待补全</span></div>
+            </div>
+            <div class="ap-card">
+              <div class="ap-card-label">错误项</div>
+              <div class="ap-card-value" style="color:#f87171;" id="statBrandMismatch">-</div>
+              <div><span class="ap-badge red">需纠偏</span></div>
+            </div>
+            <div class="ap-card">
+              <div class="ap-card-label">AI 候选</div>
+              <div class="ap-card-value" style="color:#60a5fa;" id="statNeedAI">-</div>
+              <div><span class="ap-badge acc">待评估</span></div>
+            </div>
+          </div>
+
+          <!-- Section: Category -->
+          <div class="ap-group-title">多级分类归集与结果</div>
+          <ul class="ap-meta-list">
+            <li class="ap-meta-item">
+              <span class="ap-meta-label">标准分类映射路径</span>
+              <span class="ap-badge acc" id="statPathCount">-- 条路径</span>
+            </li>
+            <li class="ap-meta-item">
+              <span class="ap-meta-label">分类冲突待归集</span>
+              <span class="ap-badge org" id="statConflictCount">-- 待确认</span>
+            </li>
+            <li class="ap-meta-item">
+              <span class="ap-meta-label">营销标签</span>
+              <span class="ap-badge grn"><span id="statMarketing">-</span> 营销分类</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- AI Process Panel: 统一容器 -->
+      <div id="panel-ai-process" class="tab-panel hidden">
+        <!-- Hidden shims for ai_process_electron.js compatibility -->
+        <input id="aiProvider" type="hidden" value="">
+        <input id="aiApiKey" type="hidden" value="">
+        <input id="aiModel" type="hidden" value="">
+        <div id="aiErrorMessage" style="display:none;"></div>
+        <div id="aiErrorText" style="display:none;"></div>
+        <div id="aiProgressSection" style="display:none;"></div>
+        <!-- AI Batch Timeline -->
+        <div id="aiBatchTimeline" class="hidden"></div>
+        <!-- AI Actions -->
+        <div id="aiActionsBar" class="hidden" style="display:flex;gap:8px;padding:8px 0;">
+          <button id="aiCancelBtn" class="btn-agent secondary" onclick="if(typeof cancelAI==='function')cancelAI();else if(typeof window.cancelAI==='function')window.cancelAI();">取消处理</button>
+          <button id="aiMonitorBtn" class="btn-agent secondary" style="font-size:11px;display:none;" onclick="if(typeof _taskPanelOpen==='function')_taskPanelOpen('AI 处理监控');">监控日志</button>
+          <div id="aiCompleteActions" class="hidden" style="display:flex;gap:6px;">
+            <button id="aiReviewBtn" class="btn-agent primary" style="font-size:11px;">进入复核</button>
+            <button id="aiDownloadBtn" class="btn-agent secondary" style="font-size:11px;">下载结果</button>
+          </div>
+        </div>
+        <!-- AI Config Panel -->
+        <div id="aiConfigPanel" class="island-panel" style="overflow:hidden;">
+          <div class="cp-header">AI 处理配置</div>
+          <div class="cp-body">
+            <div class="flex gap-2" style="align-items:flex-end;flex-wrap:wrap;">
+              <div class="field" style="flex:1;min-width:200px;"><label style="font-size:11px;color:var(--text-muted);">AI 配置</label><select id="aiConfigSelect" style="padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text-main);font-size:12px;outline:none;"><option value="">不使用 AI</option></select></div>
+              <label class="flex gap-1" style="align-items:center;font-size:11px;color:var(--text-sub);cursor:pointer;"><input type="checkbox" id="aiForceReanalyze" style="accent-color:var(--accent);">强制重新分析</label>
+            </div>
+          </div>
+          <div class="cp-footer" style="display:flex;gap:8px;">
+            <button class="btn-agent primary" onclick="if(typeof startAIProcessing==='function')startAIProcessing();">开始AI处理</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Electron brand review tab -->
+  <div id="panel-brand-review" class="tab-panel hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:0 0 12px 0;">
+      <button onclick="window._toggleGlobalBrandList()" class="btn-agent secondary" style="flex-shrink:0;">显示全部品牌</button>
+      <input id="globalBrandSearchInput" class="search-input" placeholder="搜索全部品牌..." oninput="window._electronFilterGlobalBrands(this.value)" style="flex:1;">
+    </div>
+    <div id="globalBrandListPanel" style="display:none;max-height:200px;overflow-y:auto;margin-bottom:8px;padding:8px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);"></div>
+    <div id="emBrandContent" class="island-panel list-area">
+      <div class="pane-tabs-header">
+        <div class="pane-segmented-control" id="emBrandTabs">
+          <div class="pane-segment-item active" data-tab="missing">品牌缺失<span class="tab-count" style="color:var(--orange);" id="emMissingTabCount">0</span></div>
+          <div class="pane-segment-item" data-tab="mismatch">品牌错误<span class="tab-count" style="color:var(--red);" id="emMismatchTabCount">0</span></div>
+          <div class="pane-segment-item" data-tab="valid">待确认品牌<span class="tab-count" style="color:var(--accent);" id="emValidTabCount">0</span></div>
+          <div class="pane-segment-item" data-tab="unbranded">无品牌候选<span class="tab-count" style="color:var(--text-muted);" id="emUnbrandedTabCount">0</span></div>
+        </div>
+      </div>
+      <div class="pane-view active" id="emPaneMissing">
+        <div class="stat-mini-bar">品牌缺失 <span id="emMissingCount" style="margin:0 4px;">0个商品code</span><div class="mini-progress"><div class="fill" id="emMissingProgressFill"></div></div><input class="filter-input" placeholder="搜索..." id="emMissingFilterInput" oninput="window.filterBrandGroups('missing', this.value)"></div>
+        <div class="list-content" id="emMissingGroups"></div>
+        <div id="emMissingPagination"></div>
+      </div>
+      <div class="pane-view" id="emPaneMismatch">
+        <div class="stat-mini-bar">品牌错误 <span id="emMismatchCount" style="margin:0 4px;">0个商品code</span><div class="mini-progress"><div class="fill" id="emMismatchProgressFill"></div></div><input class="filter-input" placeholder="搜索..." id="emMismatchFilterInput" oninput="window.filterBrandGroups('mismatch', this.value)"></div>
+        <div class="list-content" id="emMismatchGroups"></div>
+        <div id="emMismatchPagination"></div>
+      </div>
+      <div class="pane-view" id="emPaneValid">
+        <div class="stat-mini-bar">待确认品牌 <span id="emValidCount" style="margin:0 4px;">0个商品code</span><div class="mini-progress"><div class="fill" id="emValidProgressFill"></div></div><input class="filter-input" placeholder="搜索..." id="emValidFilterInput" oninput="window.filterBrandGroups('valid', this.value)"></div>
+        <div class="list-content" id="emValidGroups"></div>
+        <div id="emValidPagination"></div>
+      </div>
+      <div class="pane-view" id="emPaneUnbranded">
+        <div class="stat-mini-bar">无品牌候选 <span id="emUnbrandedCount" style="margin:0 4px;">0个商品code</span><div class="mini-progress"><div class="fill" id="emUnbrandedProgressFill"></div></div><input class="filter-input" placeholder="搜索..." id="emUnbrandedFilterInput" oninput="window.filterBrandGroups('unbranded', this.value)"></div>
+        <div class="list-content" id="emUnbrandedGroups"></div>
+        <div id="emUnbrandedPagination"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Electron category review tab -->
+  <div id="panel-category-review" class="tab-panel hidden">
+    <div class="pane-tabs-header">
+      <div class="pane-segmented-control" id="emCategoryTabs">
+        <div class="pane-segment-item active" data-tab="standard">标准路径<span class="tab-count" style="color:var(--green);" id="emCatStandardCount">0</span></div>
+        <div class="pane-segment-item" data-tab="conflict">冲突待归集<span class="tab-count" style="color:var(--orange);" id="emCatConflictCount">0</span></div>
+        <div class="pane-segment-item" data-tab="marketing">纯营销<span class="tab-count" style="color:var(--red);" id="emCatMarketingCount">0</span></div>
+        <div class="pane-segment-item" data-tab="missing">分类缺失<span class="tab-count" style="color:var(--orange);" id="emCatMissingCount">0</span></div>
+      </div>
+    </div>
+    <div id="emCategoryContent" class="island-panel list-area">
+      <div class="stat-mini-bar"><span id="emCatFilterLabel">标准路径</span> <span id="emCatTotalCount" style="margin:0 4px;">0个商品code</span><div class="mini-progress"><div class="fill" id="emCatProgressFill"></div></div><input class="filter-input" placeholder="搜索..." id="emCatFilterInput" oninput="if(typeof filterCategoryReview==='function')filterCategoryReview(this.value)"></div>
+      <div class="list-content" id="emCategoryGroups"></div>
+      <div id="emCategoryPagination"></div>
+    </div>
+  </div>
+
+  <!-- Electron-only tab panels -->
+  <div id="panel-review" class="tab-panel hidden"><div id="reviewContainer"></div></div>
+  <div id="panel-export" class="tab-panel hidden"><div id="exportContainer" style="padding:16px;"></div></div>
+	</div><!-- #workflowMain -->
+	<div id="agentMain" style="display:none;">
+	  <div class="agent-chat-stream" id="agentChatStream">
+	    <div class="agent-welcome">
+	      <span class="agent-welcome-icon">&#9758;</span>
+	      <p>Agent 模式 — 完整对话与分析</p>
+	    </div>
+	  </div>
+	  <div class="agent-input-dock" id="agentInputDock">
+	    <div class="agent-input-row">
+	      <input type="text" id="agentInput" placeholder="输入消息或 / 命令..." autofocus>
+	      <button class="btn btn-primary" id="agentSendBtn">发送</button>
+	    </div>
+	  </div>
+	  <aside class="agent-preview-panel" id="agentPreviewPanel" style="display:none;">
+	    <div class="preview-header">
+	      <span>报告预览</span>
+	      <button class="preview-close-btn" id="previewCloseBtn">&times;</button>
+	    </div>
+	    <div class="preview-content" id="previewContent"></div>
+	  </aside>
+	</div>
+</main>
+
+<!-- ═══ Right Column ═══ -->
+<div id="_panelStorage" style="display:none;"></div>
+<div class="rc-columns-wrapper" id="rcColumnsWrapper">
+  <div class="right-column" id="rightColumn"></div>
+  <div class="right-column" id="rightColumn2"></div>
+</div>
+
+<!-- ═══ Panels & Modals ═══ -->
+<div id="sidePanelOverlay" class="side-panel-overlay" onclick="closeSidePanel()"></div>
+<div id="sidePanel" class="side-panel">
+  <div id="sidePanelInternalHeader" class="sp-header">
+    <div>
+      <h3 id="sidePanelTitle" class="sp-title" style="margin:0;">商品列表</h3>
+      <p class="sp-subtitle" id="sidePanelSubtitle"></p>
+    </div>
+    <button onclick="closeSidePanel()" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;padding:2px 6px;">&times;</button>
+  </div>
+    <div id="panelItemsList"></div>
+    <div id="panelPagination"></div>
+    <div id="panelBatchActions"></div>
+</div>
+
+<div id="newBrandsSidebar" class="new-brands-sidebar hidden">
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+    <div class="search-box" style="flex:1;">
+      <input id="newBrandsSearch" type="text" class="search-input" placeholder="搜索品牌名称..." oninput="updateNewBrandsDisplay()">
+    </div>
+    <button onclick="showExportPreview()" class="btn btn-primary" style="font-size:11px;padding:7px 12px;white-space:nowrap;">导入品牌库</button>
+  </div>
+  <div class="scroller-list" id="newBrandsList"></div>
+</div>
+
+<div id="detailOverlay" class="detail-overlay" onclick="closeDetail()"></div>
+<div id="detailPanel" class="detail-panel"><div id="detailContent"></div></div>
+
+<div id="exportPreviewModal" class="export-modal">
+  <div class="export-modal-overlay" onclick="closeExportPreview()"></div>
+  <div class="export-modal-content" style="width:560px;">
+    <div class="dialog-header"><span class="dialog-title">导出到品牌库</span><button class="dialog-close" onclick="closeExportPreview()">&times;</button></div>
+    <div class="dialog-body">
+      <p style="font-size:12px;color:var(--text-sub);margin:0;">以下 <span id="exportCount" style="color:var(--accent);font-weight:700;">0</span> 个品牌将合并到品牌库：</p>
+      <div id="exportPreviewList" class="form-scroll"></div>
+    </div>
+    <div class="dialog-footer">
+      <button class="btn-agent secondary" onclick="closeExportPreview()">取消</button>
+      <button class="btn-agent primary" onclick="confirmExportToLibrary()">确认导出</button>
+    </div>
+  </div>
+</div>
+
+<div id="addBrandModal" class="export-modal">
+  <div class="export-modal-overlay" onclick="closeAddBrandModal()"></div>
+  <div class="export-modal-content" style="width:460px;">
+    <div class="dialog-header"><span class="dialog-title">添加/编辑品牌</span><button class="dialog-close" onclick="closeAddBrandModal()">&times;</button></div>
+    <div class="dialog-body">
+      <div><label class="form-label">品牌名称 (必填)</label><input type="text" id="modalBrandName" class="form-input" placeholder="例如: 乐事/Lay&apos;s"></div>
+      <div><label class="form-label">品牌类型</label><div class="form-row"><div id="modalBrandTypeContainer" style="flex:1;position:relative;"><input type="text" id="modalBrandType" class="form-input" placeholder="加载中..." autocomplete="off"><div id="modalBrandTypeList" class="brand-dropdown-list" style="width:100%;"></div></div><button onclick="manageBrandTypes()" class="btn-agent secondary" style="font-size:12px;flex-shrink:0;" title="管理类型">&#9881;</button></div></div>
+      <div><label class="form-label">国家/地区</label><div class="form-row"><div id="modalBrandCountryContainer" style="flex:1;position:relative;"><input type="text" id="modalBrandCountry" class="form-input" placeholder="加载中..." autocomplete="off"><div id="modalBrandCountryList" class="brand-dropdown-list" style="width:100%;"></div></div><button onclick="manageCountries()" class="btn-agent secondary" style="font-size:12px;flex-shrink:0;" title="管理国家">&#9881;</button></div></div>
+      <div id="modalParentBrandRow"><label class="form-label">关联主品牌（可选）</label><div id="modalParentBrandContainer" style="position:relative;"><input type="text" id="modalParentBrand" class="form-input" placeholder="不关联..." autocomplete="off"><div id="modalParentBrandList" class="brand-dropdown-list" style="width:100%;display:none;"></div></div><div id="modalRelationType" style="display:none;gap:16px;margin-top:8px;"><label style="font-size:13px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="document.getElementById('relationSubBrand').checked=true"><input type="radio" name="relation" id="relationSubBrand" value="sub_brand" checked> 子品牌</label><label style="font-size:13px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:6px;" onclick="document.getElementById('relationAlias').checked=true"><input type="radio" name="relation" id="relationAlias" value="alias"> 别名</label></div></div>
+    </div>
+    <div class="dialog-footer">
+      <button onclick="closeAddBrandModal()" class="btn-agent secondary" style="flex:1;">取消</button>
+      <button onclick="submitNewBrandFromModal()" class="btn-agent primary" style="flex:1;">确认添加</button>
+    </div>
+  </div>
+</div>
+
+<div id="brandConfigModal" class="export-modal">
+  <div class="export-modal-overlay" onclick="closeBrandConfigModal()"></div>
+  <div class="export-modal-content" style="width:460px;">
+    <div class="dialog-header"><span class="dialog-title" id="brandConfigModalTitle">管理</span><button class="dialog-close" onclick="closeBrandConfigModal()">&times;</button></div>
+    <div class="dialog-body">
+      <div id="brandConfigList" class="form-chips"></div>
+    </div>
+    <div class="dialog-footer">
+      <input type="text" id="brandConfigNewInput" class="form-input" style="flex:1;" placeholder="输入新名称...">
+      <button onclick="submitBrandConfigNew()" class="btn-agent primary" style="font-size:13px;">+ 新增</button>
+    </div>
+  </div>
+</div>
+
+<div id="categoryPickerModal" class="export-modal">
+  <div class="export-modal-overlay" onclick="closePickerModal()"></div>
+  <div class="export-modal-content" style="width:500px;">
+    <div class="dialog-header"><span class="dialog-title">设置分类</span><button class="dialog-close" onclick="closePickerModal()">&times;</button></div>
+    <div class="dialog-body">
+      <input type="text" id="pickerSearch" class="form-input" placeholder="搜索分类..." oninput="filterPickerTree(this.value)" autocomplete="off">
+      <div id="pickerTreeContainer" class="form-scroll" style="max-height:300px;"></div>
+      <div id="pickerSelectedDisplay" style="font-size:12px;color:var(--text-sub);min-height:20px;"></div>
+    </div>
+    <div class="dialog-footer">
+      <button onclick="closePickerModal()" class="btn-agent secondary" style="font-size:13px;">取消</button>
+      <button id="pickerConfirmBtn" onclick="confirmPickerSelection()" class="btn-agent primary" style="font-size:13px;" disabled>确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Scripts ═══ -->
+<script>window._electronMode = true;</script>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/upload.js"></script>
+<script src="/static/js/diagnosis.js"></script>
+<script src="/static/js/detail-panel.js"></script>
+<script src="/electron/js/detail_panel_electron.js"></script>
+<script src="/static/js/brand_editor.js"></script>
+<script src="/electron/js/brand_editor_electron.js"></script>
+<script src="/static/js/ai_process.js"></script>
+<script src="/electron/js/ai_process_electron.js"></script>
+<script src="/static/js/export.js"></script>
+<script src="/static/js/review.js"></script>
+<script src="/electron/js/review_electron.js"></script>
+<script src="/electron/js/brand-library.js"></script>
+<script src="/electron/js/variety_words.js"></script>
+<script src="/electron/js/category-tree.js"></script>
+<script src="/electron/js/category_review_electron.js"></script>
+<script src="/electron/js/task_panel.js"></script>
+
+	<!-- ═══ Electron Group Manager (native.css) ═══ -->
+	<script>
+	(function(){
+	  if(!window._electronMode)return;
+	  function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+	  async function loadGroupData(){try{var r=await fetch("/api/groups");return(await r.json()).groups||{};}catch(e){return{};}}
+
+	  window.showGroupManager=async function(){
+	    var groups=await loadGroupData();
+	    var old=document.querySelector('.em-group-overlay');if(old)old.remove();
+	    var overlay=document.createElement("div");
+	    overlay.className="em-group-overlay";
+	    overlay.style.cssText="position:fixed;inset:0;z-index:1003;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);";
+	    overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+	    var card=document.createElement("div");
+	    card.className="export-modal-content";
+	    card.style.cssText="position:relative;top:auto;left:auto;transform:none;width:420px;max-height:70vh;";
+	    card.onclick=function(e){e.stopPropagation();};
+	    var hdr=document.createElement("div");hdr.className="dialog-header";hdr.textContent="分组管理";card.appendChild(hdr);
+	    var body=document.createElement("div");body.className="dialog-body";
+	    var chips=document.createElement("div");chips.className="form-chips";
+	    var entries=Object.entries(groups);
+	    if(entries.length===0){var emp=document.createElement("div");emp.style.cssText="font-size:12px;color:var(--text-muted);padding:16px;text-align:center;";emp.textContent="暂无分组";chips.appendChild(emp);}
+	    else{entries.forEach(function(e){var id=e[0],g=e[1];
+	      var chip=document.createElement("div");chip.className="form-chip";
+	      var nm=document.createElement("span");nm.textContent=g.name;nm.style.color="var(--text-main)";chip.appendChild(nm);
+	      var del=document.createElement("button");del.className="chip-del";del.textContent="删除";
+	      del.onclick=function(ev){ev.stopPropagation();window._emDeleteGroup(id);};chip.appendChild(del);
+	      chips.appendChild(chip);
+	    });}
+	    body.appendChild(chips);
+	    var ft=document.createElement("div");ft.className="dialog-footer";ft.style.borderTop="none";ft.style.paddingTop="0";
+	    var inp=document.createElement("input");inp.type="text";inp.id="emNewGroupName";inp.className="form-input";inp.style.flex="1";inp.placeholder="新分组名称";ft.appendChild(inp);
+	    var btn=document.createElement("button");btn.className="btn-agent primary";btn.style.fontSize="13px";btn.textContent="新建";
+	    btn.onclick=function(){window._emCreateGroup();};ft.appendChild(btn);
+	    card.appendChild(body);card.appendChild(ft);
+	    overlay.appendChild(card);document.body.appendChild(overlay);
+	  };
+
+	  window._emCreateGroup=async function(){
+	    var name=document.getElementById("emNewGroupName").value.trim();
+	    if(!name){alert("请输入名称");return;}
+	    try{
+	      var r=await fetch("/api/groups",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name})});
+	      var d=await r.json();
+	      if(d.success){
+	        var ov=document.querySelector('.em-group-overlay');if(ov)ov.remove();
+	        window.showGroupManager();
+	        if(typeof loadGroups==="function")loadGroups();
+	      }
+	    }catch(e){alert("创建失败: "+e.message);}
+	  };
+
+	  window._emDeleteGroup=async function(id){
+	    if(!confirm("确定删除此分组？该操作不可撤销。"))return;
+	    try{
+	      await fetch("/api/groups/"+id,{method:"DELETE"});
+	      var ov=document.querySelector('.em-group-overlay');if(ov)ov.remove();
+	      window.showGroupManager();
+	      if(typeof loadGroups==="function")loadGroups();
+	    }catch(e){alert("删除失败: "+e.message);}
+	  };
+	})();
+	</script>
+	<script>
+		/* ── Override brand config modal: DOM API + native.css, no Tailwind ── */
+		renderBrandConfigList = function() {
+		  var container = document.getElementById('brandConfigList');
+		  if (!container) return;
+		  container.textContent = '';
+		  fetch('/api/brands/config').then(function(r){return r.json();}).then(function(config) {
+		    var items;
+		    if (typeof brandConfigMode === 'undefined' || brandConfigMode === 'types') {
+		      document.getElementById('brandConfigModalTitle').textContent = '管理品牌类型';
+		      document.getElementById('brandConfigNewInput').placeholder = '输入新类型名称...';
+		      items = (config.brand_types || []).map(function(t) { return { id: t, label: t, delVal: t }; });
+		    } else {
+		      document.getElementById('brandConfigModalTitle').textContent = '管理国家/地区';
+		      document.getElementById('brandConfigNewInput').placeholder = '输入: 国家代码 国家名称 (如: KR 韩国)';
+		      items = (config.countries || []).map(function(c) { return { id: c.code, label: c.code + ' (' + c.name + ')', delVal: c.code }; });
+		    }
+		    if (!items.length) {
+		      var empty = document.createElement('div');
+		      empty.style.cssText = 'font-size:12px;color:var(--text-muted);padding:16px;text-align:center;';
+		      empty.textContent = '暂无数据';
+		      container.appendChild(empty); return;
+		    }
+		    items.forEach(function(item) {
+		      var chip = document.createElement('div'); chip.className = 'form-chip';
+		      var nm = document.createElement('span'); nm.textContent = item.label; nm.style.color = 'var(--text-main)'; chip.appendChild(nm);
+		      var del = document.createElement('button'); del.className = 'chip-del'; del.textContent = '✕';
+		      del.onclick = function() { if (typeof deleteBrandConfigItem === 'function') deleteBrandConfigItem(item.delVal); };
+		      chip.appendChild(del); container.appendChild(chip);
+		    });
+		  }).catch(function(e) { container.textContent = ''; var err = document.createElement('div');
+		    err.style.cssText = 'font-size:12px;color:var(--red);padding:8px;'; err.textContent = '加载失败: ' + e.message; container.appendChild(err);
+		  });
+		};
+		/* ── Override renderPickerTree with DOM API (web version uses innerHTML+Tailwind) ── */
+		filterPickerTree = function(text) { renderPickerTree(text ? text.toLowerCase() : ''); };
+		renderPickerTree = function(filter) {
+		  var options = window.categoryOptions;
+		  var container = document.getElementById('pickerTreeContainer');
+		  if (!container) return;
+		  container.textContent = '';
+		  if (!options || !options.level1) {
+		    var empty = document.createElement('p');
+		    empty.style.cssText = 'font-size:11px;color:var(--text-muted);padding:8px;';
+		    empty.textContent = '暂无分类数据';
+		    container.appendChild(empty); return;
+		  }
+		  var ft = filter || '';
+		  (ft ? options.level1.filter(function(l1) { return l1.toLowerCase().indexOf(ft)!==-1 || (options.level2_by_level1[l1]||[]).some(function(l2) { return l2.toLowerCase().indexOf(ft)!==-1 || (options.level3_by_level2[l1+' > '+l2]||[]).some(function(l3) { return l3.toLowerCase().indexOf(ft)!==-1; }); }); }) : options.level1).forEach(function(l1) {
+		    var l1Node = document.createElement('div'); l1Node.className = 'tree-node';
+		    var l1Toggle = document.createElement('div');
+		    l1Toggle.style.cssText = 'display:flex;align-items:center;gap:4px;padding:3px 0;cursor:pointer;font-size:12px;color:var(--text-main);font-weight:500;';
+		    var l1Arrow = document.createElement('span');
+		    l1Arrow.style.cssText = 'font-size:8px;color:var(--text-muted);width:10px;display:inline-block;text-align:center;';
+		    l1Arrow.textContent = '▼';
+		    l1Toggle.appendChild(l1Arrow); l1Toggle.appendChild(document.createTextNode(l1));
+		    var l1Children = document.createElement('div'); l1Children.className = 'tree-children';
+		    l1Toggle.onclick = function() { l1Children.classList.toggle('hidden'); l1Arrow.textContent = l1Children.classList.contains('hidden') ? '▶' : '▼'; };
+		    (options.level2_by_level1[l1] || []).forEach(function(l2) {
+		      var l3s = (options.level3_by_level2[l1 + ' > ' + l2] || []).filter(function(l3) { return !ft || (l1+' > '+l2+' > '+l3).toLowerCase().indexOf(ft)!==-1 || l3.toLowerCase().indexOf(ft)!==-1; });
+		      if (!l3s.length && ft) return;
+		      var l2Node = document.createElement('div'); l2Node.className = 'tree-node'; l2Node.style.marginLeft = '10px';
+		      var l2Toggle = document.createElement('div');
+		      l2Toggle.style.cssText = 'display:flex;align-items:center;gap:4px;padding:2px 0;cursor:pointer;font-size:11px;color:var(--text-sub);';
+		      var l2Arrow = document.createElement('span');
+		      l2Arrow.style.cssText = 'font-size:7px;color:var(--text-muted);width:10px;display:inline-block;text-align:center;';
+		      l2Arrow.textContent = '▼';
+		      l2Toggle.appendChild(l2Arrow); l2Toggle.appendChild(document.createTextNode(l2));
+		      var l2Children = document.createElement('div'); l2Children.className = 'tree-children';
+		      l2Toggle.onclick = function() { l2Children.classList.toggle('hidden'); l2Arrow.textContent = l2Children.classList.contains('hidden') ? '▶' : '▼'; };
+		      (l3s.length ? l3s : (options.level3_by_level2[l1+' > '+l2]||[])).forEach(function(l3) {
+		        var path = l1 + ' > ' + l2 + ' > ' + l3;
+		        var l3Row = document.createElement('div');
+		        l3Row.style.cssText = 'padding:2px 0 2px 22px;cursor:pointer;font-size:11px;color:var(--text-sub);border-radius:var(--radius-sm);';
+		        l3Row.textContent = l3;
+		        if (typeof pickerPath !== 'undefined' && pickerPath === path) {
+		          l3Row.style.background = 'rgba(56,189,248,0.12)'; l3Row.style.color = 'var(--accent)';
+		        }
+		        l3Row.onmouseenter = function() { this.style.background = 'rgba(255,255,255,0.04)'; };
+		        l3Row.onmouseleave = function() { this.style.background = (typeof pickerPath!=='undefined' && pickerPath === path) ? 'rgba(56,189,248,0.12)' : ''; };
+		        l3Row.onclick = function() { if (typeof selectPickerPath === 'function') selectPickerPath(path); };
+		        l2Children.appendChild(l3Row);
+		      });
+		      l2Node.appendChild(l2Toggle); l2Node.appendChild(l2Children); l1Children.appendChild(l2Node);
+		    });
+		    l1Node.appendChild(l1Toggle); l1Node.appendChild(l1Children); container.appendChild(l1Node);
+		  });
+		};
+	</script>
+
+
+<script src="/electron/js/timeline_utils.js"></script>
+<script src="/electron/js/timeline.js"></script>
+<script src="/electron/js/bat_config.js"></script>
+<script src="/electron/js/agent.js"></script>
+
+<!-- ═══ Init ═══ -->
+<script>
+(function(){
+var STEP_LABEL={'upload':'上传 & 诊断','brand-review':'品牌审核','category-review':'分类审核','ai-process':'AI 处理','review':'复核','export':'导出'};
+var PAGE_SECTION={'brand-database':'品牌库','brand-corrections':'品牌库','variety-words':'品牌库','category-tree':'分类体系','category-classify':'分类体系'};
+var PAGE_LABEL={'brand-database':'品牌数据库','brand-corrections':'品牌修正记录','variety-words':'词库管理','category-tree':'分类路径树','category-classify':'路径分类标记'};
+var ICONS={
+  done:'<svg class="status-icon done" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>',
+  pending:'<svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>',
+  active:'<svg class="status-icon active" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>',
+  processing:'<svg class="status-icon processing" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>',
+  failed:'<svg class="status-icon failed" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>'
+};
+var _current=null;
+function H(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// Right-column panel helpers
+var _rcResize={active:false,startX:0,startW:0,startY:0,startH:0,target:null};
+function _chooseColumn(){
+  var c1=document.getElementById('rightColumn'),c2=document.getElementById('rightColumn2');
+  var n1=c1.querySelectorAll('.panel-card').length,n2=c2.querySelectorAll('.panel-card').length;
+  if(n1<2)return c1;if(n2<2)return c2;return c2;
+}
+function _balanceColumns(){
+  var c1=document.getElementById('rightColumn'),c2=document.getElementById('rightColumn2');
+  var cards1=c1.querySelectorAll('.panel-card'),cards2=c2.querySelectorAll('.panel-card');
+  if(cards1.length<2&&cards2.length>0)c1.appendChild(cards2[cards2.length-1]);
+  _refreshAll();
+}
+function _refreshAll(){
+  var c1=document.getElementById('rightColumn'),c2=document.getElementById('rightColumn2');
+  var n1=c1.querySelectorAll('.panel-card').length,n2=c2.querySelectorAll('.panel-card').length;
+  var w=document.getElementById('rcColumnsWrapper');
+  w.classList.toggle('open',n1+n2>0);
+  if(n2>0)c2.classList.add('open');else c2.classList.remove('open');
+  if(n1>0)c1.classList.add('open');else if(n2===0)c1.classList.remove('open');
+  var handle=w.querySelector('.rc-col-resize-handle');
+  if(n2>0){
+    if(!handle){
+      handle=document.createElement('div');handle.className='rc-col-resize-handle';
+      handle.addEventListener('mousedown',function(e){
+        _rcResize.active=true;_rcResize.target='col-resize';
+        _rcResize._c1=c1;_rcResize._c2=c2;
+        _rcResize._startW1=c1.offsetWidth;_rcResize._startW2=c2.offsetWidth;
+        _rcResize.startX=e.clientX;handle.classList.add('active');e.preventDefault();
+      });
+      c1.after(handle);
+    }
+    handle.classList.add('visible');
+  }else if(handle)handle.classList.remove('visible');
+  c1.querySelectorAll('.panel-card').forEach(function(c){c.style.flex='1 1 0';});
+  c2.querySelectorAll('.panel-card').forEach(function(c){c.style.flex='1 1 0';});
+  _refreshPanelHandles();_initRCSize();
+}
+function _movePanelToCard(panelId,cardId,title){
+  var card=document.querySelector('[data-panel="'+cardId+'"]');
+  if(!card){
+    var col=_chooseColumn();
+    card=document.createElement('div');card.className='panel-card';
+    card.setAttribute('data-panel',cardId);
+    var hdr=document.createElement('div');hdr.className='panel-card-header';
+    var hdrTitle=document.createElement('span');hdrTitle.className='panel-card-title';hdrTitle.textContent=title;hdr.appendChild(hdrTitle);
+    var hdrClose=document.createElement('button');hdrClose.className='panel-card-close';hdrClose.textContent='×';hdr.appendChild(hdrClose);
+    card.appendChild(hdr);
+    var bd=document.createElement('div');bd.className='panel-card-body';card.appendChild(bd);
+    card.querySelector('.panel-card-close').addEventListener('click',function(){window._closePanelCard(cardId,panelId);});
+    col.appendChild(card);
+  }
+  var t=card.querySelector('.panel-card-title');if(t)t.textContent=title;
+  var body=card.querySelector('.panel-card-body');
+  var panel=document.getElementById(panelId);
+  if(panel&&panel.parentNode!==body){
+    panel.style.cssText='position:relative;width:100%;height:auto;right:auto;top:auto;background:transparent;border:0;border-radius:0;padding:0;box-shadow:none;z-index:auto;display:flex;flex-direction:column;overflow:hidden;max-height:100%;';
+    panel.classList.remove('hidden');
+    body.appendChild(panel);
+    var ih=panel.querySelector('#sidePanelInternalHeader');if(ih)ih.style.display='none';
+  }
+  _refreshAll();return body;
+}
+window._movePanelToCard=_movePanelToCard;
+window._closePanelCard=function(cardId,panelId){
+  var card=document.querySelector('[data-panel="'+cardId+'"]');
+  if(card){
+    var panel=document.getElementById(panelId);
+    if(panel){
+      var ih=panel.querySelector('#sidePanelInternalHeader');if(ih)ih.style.display='';
+      panel.style.cssText='';var s=document.getElementById('_panelStorage');if(s)s.appendChild(panel);
+    }
+    card.remove();
+  }
+  _balanceColumns();_refreshAll();
+};
+function _initRCSize(){
+  var c1=document.getElementById('rightColumn');
+  if(!c1||c1.querySelector('.rc-resize-handle'))return;
+  var h=document.createElement('div');h.className='rc-resize-handle';
+  h.addEventListener('mousedown',function(e){
+    _rcResize.active=true;_rcResize.target=c1;_rcResize.startX=e.clientX;_rcResize.startW=c1.offsetWidth;
+    h.classList.add('active');e.preventDefault();
+  });
+  c1.appendChild(h);
+}
+function _refreshPanelHandles(){
+  [document.getElementById('rightColumn'),document.getElementById('rightColumn2')].forEach(function(rc){
+    if(!rc)return;
+    rc.querySelectorAll('.panel-resize-handle').forEach(function(h){h.remove();});
+    var cards=rc.querySelectorAll('.panel-card');if(cards.length<2)return;
+    for(var i=0;i<cards.length-1;i++){
+      var handle=document.createElement('div');handle.className='panel-resize-handle';
+      (function(idx,col){handle.addEventListener('mousedown',function(e){
+        var a=col.querySelectorAll('.panel-card')[idx],b=col.querySelectorAll('.panel-card')[idx+1];
+        _rcResize.active=true;_rcResize.target='panel';_rcResize._cardA=a;_rcResize._cardB=b;
+        _rcResize._startHA=a.offsetHeight;_rcResize._startHB=b.offsetHeight;
+        _rcResize.startY=e.clientY;handle.classList.add('active');e.preventDefault();
+      });})(i,rc);
+      cards[i].after(handle);
+    }
+  });
+}
+document.addEventListener('mousemove',function(e){
+  if(!_rcResize.active)return;
+  if(_rcResize.target==='col-resize'){
+    var dx=e.clientX-_rcResize.startX,w1=_rcResize._startW1+dx,w2=_rcResize._startW2-dx;
+    if(w1<200){w1=200;w2=_rcResize._startW1+_rcResize._startW2-200;}
+    if(w2<200){w2=200;w1=_rcResize._startW1+_rcResize._startW2-200;}
+    _rcResize._c1.style.width=w1+'px';_rcResize._c2.style.width=w2+'px';
+  }else if(_rcResize.target&&_rcResize.target!=='panel'){
+    var w=_rcResize.startW-(e.clientX-_rcResize.startX);
+    if(w<280)w=280;if(w>window.innerWidth*0.55)w=window.innerWidth*0.55;
+    _rcResize.target.style.width=w+'px';
+  }else if(_rcResize.target==='panel'){
+    var dy=e.clientY-_rcResize.startY,a=_rcResize._cardA,b=_rcResize._cardB;
+    var ha=_rcResize._startHA+dy,hb=_rcResize._startHB-dy;
+    if(ha<80){ha=80;hb=_rcResize._startHA+_rcResize._startHB-80;}
+    if(hb<80){hb=80;ha=_rcResize._startHA+_rcResize._startHB-80;}
+    a.style.flex='0 0 '+ha+'px';b.style.flex='0 0 '+hb+'px';
+  }
+});
+document.addEventListener('mouseup',function(){
+  if(!_rcResize.active)return;_rcResize.active=false;
+  document.querySelectorAll('.rc-resize-handle.active,.panel-resize-handle.active,.rc-col-resize-handle.active').forEach(function(h){h.classList.remove('active');});
+});
+_initRCSize();
+
+// Navigation
+function updateBreadcrumb(){
+  if(!_current)return;
+  var step=document.getElementById('breadcrumbStep');
+  if(_current.type==='page'){
+    step.textContent=PAGE_SECTION[_current.id]||'';
+  }else{
+    step.textContent=STEP_LABEL[_current.id]||'';
+  }
+}
+function highlightSidebar(){
+  document.querySelectorAll('.nav-item[data-step],.nav-item[data-page]').forEach(function(el){
+    var m=(_current&&_current.type==='step'&&el.getAttribute('data-step')===_current.id)||(_current&&_current.type==='page'&&el.getAttribute('data-page')===_current.id);
+    el.classList.toggle('active',m);
+  });
+}
+function showStepContent(step){
+  var tl=document.getElementById('agentTimeline');
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.add('hidden');});
+  if(step==='upload'){
+    if(tl)tl.style.display='';
+  }else if(step==='brand-review'){
+    if(tl)tl.style.display='none';
+    var p=document.getElementById('panel-brand-review');if(p)p.classList.remove('hidden');
+    setTimeout(function(){
+      var els=[
+        ['body',document.body],
+        ['main-area',document.getElementById('electronMainContent')],
+        ['tab-panel',document.getElementById('panel-brand-review')],
+        ['emBrandContent',document.getElementById('emBrandContent')],
+        ['emPaneMissing',document.getElementById('emPaneMissing')],
+        ['emMissingGroups',document.getElementById('emMissingGroups')]
+      ];
+      els.forEach(function(e){
+        if(!e[1])return;
+        var s=getComputedStyle(e[1]);
+        console.log(e[0]+':','h='+e[1].offsetHeight,'sh='+e[1].scrollHeight,'overflow='+s.overflowY,'display='+s.display,'flex='+s.flex);
+      });
+    },500);
+  }else if(step==='category-review'){
+    if(tl)tl.style.display='none';    var p=document.getElementById('panel-category-review');if(p)p.classList.remove('hidden');
+    setTimeout(function(){if(typeof renderCategoryReview==='function')renderCategoryReview();},100);
+  }else if(step==='ai-process'){
+    if(tl)tl.style.display='none';    var p=document.getElementById('panel-ai-process');if(p)p.classList.remove('hidden');  // AI 元素已统一收归 panel-ai-process
+  }else if(step==='review'||step==='export'){
+    if(tl)tl.style.display='none';  }
+  document.querySelectorAll('[id^="pagePanel-"]').forEach(function(p){p.style.display='none';});
+}
+function showPagePanel(page){
+  var tl=document.getElementById('agentTimeline');
+  if(tl)tl.style.display='none';
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.add('hidden');});
+  document.querySelectorAll('[id^="pagePanel-"]').forEach(function(p){p.style.display='none';});
+  var pid='pagePanel-'+page,panel=document.getElementById(pid);
+  if(!panel){
+    panel=document.createElement('div');panel.id=pid;
+    panel.style.cssText='flex:1;overflow-y:auto;padding:20px';
+    var main=document.getElementById('workflowMain');
+    main.appendChild(panel);
+    if(page==='brand-database'){var d=document.createElement('div');d.id='brandDatabaseContent';panel.appendChild(d);setTimeout(function(){if(typeof renderBrandDatabase==='function')renderBrandDatabase();},50);}
+    else if(page==='category-tree'){
+      var wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;gap:10px;height:100%;';
+      var tb=document.createElement('div');tb.className='tree-toolbar';
+      var sb1=document.createElement('div');sb1.className='search-box';var inp1=document.createElement('input');inp1.id='pageCateTreeSearch';inp1.placeholder='搜索分类路径...';inp1.className='search-input';inp1.oninput=function(){filterCategoryTreePage(this.value);};sb1.appendChild(inp1);tb.appendChild(sb1);
+      var sb2=document.createElement('div');sb2.className='search-box';var inp2=document.createElement('input');inp2.id='pageProductSearch';inp2.placeholder='搜商品名/编码...';inp2.className='search-input';inp2.oninput=function(){searchProductPage(this.value);};sb2.appendChild(inp2);tb.appendChild(sb2);
+      var tgl=document.createElement('button');tgl.id='pageToggleMktBtn';tgl.className='btn-toggle';tgl.textContent='隐藏营销';tgl.onclick=function(){toggleMarketingPage();};tb.appendChild(tgl);
+      wrap.appendChild(tb);
+      var sres=document.createElement('div');sres.id='pageProductSearchResults';sres.style.cssText='display:none;max-height:200px;overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;';wrap.appendChild(sres);
+      var ct=document.createElement('div');ct.id='pageCateTreeContainer';ct.style.cssText='flex:1;overflow-y:auto;';wrap.appendChild(ct);
+      panel.appendChild(wrap);
+      setTimeout(function(){if(typeof renderCategoryTreePage==='function')renderCategoryTreePage();},50);
+    }
+    else if(page==='category-classify'){var d=document.createElement('div');d.id='categoryClassifyContent';panel.appendChild(d);setTimeout(function(){if(typeof _renderClassifyPage==='function')_renderClassifyPage();},50);}
+    else if(page==='brand-corrections'){var d=document.createElement('div');d.id='brandCorrectionsContent';panel.appendChild(d);setTimeout(function(){if(typeof _renderBrandCorrectionsPage==='function')_renderBrandCorrectionsPage();},50);}
+    else if(page==='variety-words'){panel.style.cssText='flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column';var d=document.createElement('div');d.id='varietyWordsContent';d.style.cssText='flex:1;min-height:0;gap: 10px;display:flex;flex-direction:column;';panel.appendChild(d);setTimeout(function(){if(typeof renderVarietyWords==='function')renderVarietyWords();},50);}
+    else{
+      var ph=document.createElement('div');ph.style.cssText='padding:40px;text-align:center;color:var(--text-muted)';
+      var p1=document.createElement('p');p1.style.cssText='font-size:16px;font-weight:500;margin-bottom:8px';p1.textContent=PAGE_LABEL[page]||page;ph.appendChild(p1);
+      var p2=document.createElement('p');p2.style.cssText='font-size:12px';p2.textContent='功能将在后续任务中激活';ph.appendChild(p2);
+      panel.appendChild(ph);
+    }
+  }
+  panel.style.display='';
+  if(page==='category-tree'&&typeof renderCategoryTreePage==='function'){
+    setTimeout(function(){renderCategoryTreePage();},50);
+  }
+}
+function navigateToStep(step){
+  _current={type:'step',id:step};
+  highlightSidebar();showStepContent(step);updateBreadcrumb();
+  if(step==='review'&&typeof sessionId!=='undefined'&&sessionId){
+    var panel=document.getElementById('panel-review');if(panel)panel.classList.remove('hidden');
+    if(typeof window.renderElectronReview==='function')window.renderElectronReview();
+  }
+}
+function navigateToSidebar(page){
+  _current={type:'page',id:page};
+  highlightSidebar();showPagePanel(page);updateBreadcrumb();
+}
+function setStepIconHTML(step,status){
+  var el=document.querySelector('.nav-item[data-step="'+step+'"] .status-icon');
+  if(el){var w=document.createElement('span');w.insertAdjacentHTML('beforeend',ICONS[status]||ICONS.pending);el.parentNode.replaceChild(w.firstChild,el);}
+}
+function setStepDone(step){setStepIconHTML(step,'done');}
+function setStepActive(step){setStepIconHTML(step,'active');}
+function setStepProcessing(step){setStepIconHTML(step,'processing');}
+function setStepFailed(step){setStepIconHTML(step,'failed');}
+function loadGroups(){
+  fetch('/api/groups').then(function(r){return r.json()}).then(function(d){
+    var s=document.getElementById('electronGroupSelect');if(!s)return;var c=s.value;
+    s.textContent = '';
+    var opt0 = document.createElement('option'); opt0.value = ''; opt0.textContent = '-- 选择分组 --'; s.appendChild(opt0);
+    Object.entries(d.groups||{}).forEach(function(e){var o=document.createElement('option');o.value=e[0];o.textContent=H(e[1].name);s.appendChild(o);});
+    var g=localStorage.getItem('last_group_id')||'';s.value=c||g;
+    var u=document.getElementById('uploadGroup');if(u&&g)u.value=g;
+    // 更新面包屑分组名
+    var bg=document.getElementById('breadcrumbGroup');
+    if(bg&&g){var selOpt=s.options[s.selectedIndex];if(selOpt&&selOpt.value)bg.textContent=selOpt.textContent;}
+    // 恢复上次 session
+    var lastSid=localStorage.getItem('last_session_id');
+    if(lastSid)_switchSession(lastSid);
+  }).catch(function(){});
+}
+function renderHistory(){ console.log('[DEBUG] renderHistory called');
+  var e=document.getElementById('electronHistory');if(!e)return;
+  var gid = document.getElementById('electronGroupSelect') ? document.getElementById('electronGroupSelect').value : '';
+  fetch('/api/sessions' + (gid ? '?group_id=' + encodeURIComponent(gid) : '')).then(function(r){return r.json()}).then(function(d){
+    e.textContent = '';
+    var sessions = d.sessions || [];
+    if (!sessions.length) {
+      var empty = document.createElement('div');
+      empty.style.cssText = 'font-size:11px;color:var(--text-muted);padding:4px 8px;';
+      empty.textContent = '暂无历史会话';
+      e.appendChild(empty); return;
+    }
+    sessions.forEach(function(s) {
+      var item = document.createElement('div');
+      item.className = 'nav-item'; item.style.cssText = 'font-size:11px;cursor:pointer;';
+      var name = document.createElement('span');
+      name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      var gname = s.group_name || '';
+      name.textContent = (gname ? gname + '/' : '') + (_cleanFileName(s.file_name) || _cleanFileName(s.display_name) || s.session_id).substring(0, 28);
+      var del = document.createElement('span');
+      del.style.cssText = 'color:var(--red);font-size:10px;opacity:0;margin-left:4px;flex-shrink:0;cursor:pointer;';
+      del.textContent = '\u2715';
+      del.onclick = (function(sid){return function(ev){ev.stopPropagation();_deleteSession(sid);setTimeout(function(){renderHistory();},200);};})(s.session_id);
+      item.onclick = function(){_switchSession(s.session_id);};
+      item.onmouseover = function(){del.style.opacity='1';};
+      item.onmouseout = function(){del.style.opacity='0';};
+      item.appendChild(name); item.appendChild(del); e.appendChild(item);
+    });
+  }).catch(function(){});
+	}
+
+	function switchGroup(g){localStorage.setItem('last_group_id',g);var u=document.getElementById('uploadGroup');if(u)u.value=g;var bg=document.getElementById('breadcrumbGroup');var sel=document.getElementById('electronGroupSelect');if(bg&&sel){var opt=sel.options[sel.selectedIndex];if(opt&&opt.textContent)bg.textContent=opt.textContent;}renderHistory();}
+
+// Init
+document.querySelectorAll('.nav-item[data-step]').forEach(function(el){
+  el.addEventListener('click',function(){navigateToStep(el.getAttribute('data-step'));});
+  el.style.cursor='pointer';
+});
+	// Expose globals before init
+	window.electronSwitchGroup=switchGroup;
+	window.electronOpenSettings=function(){if(window.electronAPI)window.electronAPI.openSettings();else window.open('/settings','_blank');};
+	window.navigateToSidebar=navigateToSidebar;
+	window.navigateToStep=navigateToStep;
+	window.setStepDone=setStepDone;window.setStepActive=setStepActive;
+	window.setStepProcessing=setStepProcessing;window.setStepFailed=setStepFailed;
+
+	// Init — sidebar page navigation
+	document.querySelectorAll('.nav-item[data-page]').forEach(function(el){
+	  el.addEventListener('click',function(){navigateToSidebar(el.getAttribute('data-page'));});
+	  el.style.cursor='pointer';
+	});
+	var sb=document.getElementById('electronSettingsBtn');if(sb)sb.onclick=window.electronOpenSettings;
+		
+	loadGroups();renderHistory();
+	navigateToStep('upload');
+
+	/* ── Sidebar toggle ── */
+	var sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
+	var sidebarExpandBtn = document.getElementById('sidebarExpandBtn');
+	var electronSidebar = document.getElementById('electronSidebar');
+	if (sidebarCollapseBtn) {
+	  sidebarCollapseBtn.addEventListener('click', function() {
+	    electronSidebar.classList.add('collapsed');
+	    if (sidebarExpandBtn) sidebarExpandBtn.classList.add('show');
+	  });
+	}
+	if (sidebarExpandBtn) {
+	  sidebarExpandBtn.addEventListener('click', function() {
+	    electronSidebar.classList.remove('collapsed');
+	    sidebarExpandBtn.classList.remove('show');
+	  });
+	}
+
+	/* ── Sidebar tab switching ── */
+	(function() {
+	  var tabs = document.querySelectorAll('#sidebarTabs .sidebar-tab-item');
+	  var panes = { workflow: document.getElementById('paneWorkflow'), agent: document.getElementById('paneAgent') };
+	  var mains = { workflow: document.getElementById('workflowMain'), agent: document.getElementById('agentMain') };
+	  tabs.forEach(function(tab) {
+	    tab.addEventListener('click', function() {
+	      tabs.forEach(function(t) { t.classList.remove('active'); });
+	      tab.classList.add('active');
+	      var key = tab.getAttribute('data-tab'); console.log('[DEBUG] Tab switch to:', key);
+	      Object.keys(panes).forEach(function(k) {
+	        if (panes[k]) panes[k].classList.toggle('active', k === key);
+	        if (mains[k]) mains[k].style.display = (k === key) ? '' : 'none';
+	      });
+	      // Hide/show group-select-row based on mode
+	      var grpRow = document.querySelector('.group-select-row');
+	      if (grpRow) grpRow.style.display = key === 'workflow' ? '' : 'none';
+	    });
+	  });
+	})();
+
+	/* ── Session management ── */
+	function _sessionMenuOpen() { return document.getElementById('sessionMenu').classList.contains('show'); }
+window._cleanFileName = function(fn) {
+  if (!fn) return '';
+  return fn.replace(/^session_\d+_[a-f0-9]+_/, '').replace(/^temp_\d+_/, '');
+};
+
+var toggleSessionMenu = window.toggleSessionMenu = function() { console.log('[DEBUG] toggleSessionMenu called');
+console.log('[AFTER-ASSIGN] toggleSessionMenu type:', typeof window.toggleSessionMenu);
+	  var menu = document.getElementById('sessionMenu');
+	  if (!menu) return;
+	  var isOpen = menu.classList.contains('show');
+	  if (isOpen) { menu.classList.remove('show'); return; }
+	  _loadSessionMenu(menu);
+	  menu.classList.add('show');
+	};
+
+	async function _loadSessionMenu(menu) {
+	  menu.textContent = '';
+	  try {
+	    var gid = document.getElementById('electronGroupSelect') ? document.getElementById('electronGroupSelect').value : '';
+	    var url = '/api/sessions' + (gid ? '?group_id=' + encodeURIComponent(gid) : '');
+	    var res = await fetch(url);
+	    var data = await res.json();
+	    var sessions = data.sessions || [];
+	    var curSid = typeof sessionId !== 'undefined' ? sessionId : '';
+	    sessions.forEach(function(s) {
+	      var item = document.createElement('div');
+	      item.className = 'context-item';
+	      var name = document.createElement('span'); name.className = 'ctx-name'; name.textContent = _cleanFileName(s.display_name) || _cleanFileName(s.file_name) || s.session_id;
+	      var time = document.createElement('span'); time.className = 'ctx-time'; time.textContent = (s.created || '').substring(0, 10);
+	      var del = document.createElement('span'); del.className = 'ctx-del'; del.textContent = '✕';
+	      del.onclick = (function(sid) { return function(e) { e.stopPropagation(); _deleteSession(sid); }; })(s.session_id);
+	      item.appendChild(name); item.appendChild(time); item.appendChild(del);
+	      item.onclick = (function(sid) { return function(e) { if (e.target.classList.contains('ctx-del')) return; _switchSession(sid); }; })(s.session_id);
+	      menu.appendChild(item);
+	    });
+	    var sep = document.createElement('div'); sep.className = 'menu-sep'; menu.appendChild(sep);
+	    var ns = document.createElement('div'); ns.className = 'context-item new-session';
+	    ns.textContent = '+ 新建会话'; ns.onclick = _newSession;
+	    menu.appendChild(ns);
+	  } catch(e) {
+	    var err = document.createElement('div'); err.className = 'context-item';
+	    err.textContent = '加载失败: ' + e.message; menu.appendChild(err);
+	  }
+	}
+
+	async function _switchSession(sid) {
+	  try {
+	    var res = await fetch('/api/session/switch', {
+	      method: 'POST', headers: { 'Content-Type': 'application/json' },
+	      body: JSON.stringify({ session_id: sid })
+	    });
+	    var data = await res.json();
+	    if (!data.success) { alert(data.error); return; }
+	    var s = data.session;
+	    window.sessionId = sid; sessionId = sid;
+	    localStorage.setItem('last_session_id', sid);
+	    if (s.diagnosis_result) {
+	      window.diagnosisData = s.diagnosis_result;
+	      window.diagnosisData.brand_clusters = s.diagnosis_result.brand_clusters || [];
+	    }
+	    if (s.brand_rules) window.brandRules = s.brand_rules;
+	    if (s.new_brands) window.newBrands = s.new_brands;
+	    var ug = document.getElementById('electronGroupSelect');
+	    if (ug && s.group_id) { ug.value = s.group_id; localStorage.setItem('last_group_id', s.group_id); }
+	    var sw = document.getElementById('breadcrumbSession');
+	    var gname2 = s.group_name || '';
+    if (sw) sw.textContent = (_cleanFileName(s.file_name) || sid);
+	    var bg = document.getElementById('breadcrumbGroup');
+	    if (bg && gname2) bg.textContent = gname2;
+	    document.getElementById('sessionMenu').classList.remove('show');
+	    if (typeof window._tlRestoreSession === 'function') window._tlRestoreSession();
+	    if (typeof renderBrandTabs === 'function') {
+	      setTimeout(function() { renderBrandTabs(s.diagnosis_result.brand_clusters || []); }, 300);
+	    }
+	    if (typeof renderCategoryTreePage === 'function') {
+	      setTimeout(function() { renderCategoryTreePage(); }, 500);
+	    }
+	  } catch(e) { alert('切换失败: ' + e.message); }
+	}
+
+	async function _deleteSession(sid) {
+	  if (!confirm('确定删除这个会话？')) return;
+	  try {
+	    await fetch('/api/session/delete', {
+	      method: 'POST', headers: { 'Content-Type': 'application/json' },
+	      body: JSON.stringify({ session_id: sid })
+	    });
+	    if (typeof sessionId !== 'undefined' && sessionId === sid) {
+	      sessionId = ''; window.sessionId = '';
+	      var sw = document.getElementById('breadcrumbSession');
+	      if (sw) sw.textContent = '选择会话';
+	    }
+	    var menu = document.getElementById('sessionMenu');
+	    if (menu && menu.classList.contains('show')) _loadSessionMenu(menu);
+	  } catch(e) { alert('删除失败: ' + e.message); }
+	}
+
+	window._updateBreadcrumbSession = function(text) {
+	  var sw = document.getElementById('breadcrumbSession');
+	  if (sw && text) sw.textContent = text;
+	};
+
+	window._newSession = function() {
+	  var sw = document.getElementById('breadcrumbSession');
+	  if (sw) sw.textContent = '选择会话';
+	  sessionId = ''; window.sessionId = '';
+	  window.diagnosisData = null; window.brandRules = {}; window.newBrands = [];
+	  var menu = document.getElementById('sessionMenu');
+	  if (menu) menu.classList.remove('show');
+	  // Reset timeline drop zone
+	  var drop = document.getElementById('tlDrop');
+	  if (drop) {
+	    drop.classList.remove('file-loaded');
+	    drop.textContent = '';
+	    var _sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+	    _sv.setAttribute('width', '32'); _sv.setAttribute('height', '32');
+	    _sv.setAttribute('viewBox', '0 0 24 24'); _sv.setAttribute('fill', 'none');
+	    _sv.setAttribute('stroke', 'var(--text-sub)'); _sv.setAttribute('stroke-width', '1.5');
+	    _sv.setAttribute('stroke-linecap', 'round'); _sv.setAttribute('stroke-linejoin', 'round');
+	    var _p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+	    _p.setAttribute('d', 'M12 5v14M5 12h14'); _sv.appendChild(_p);
+	    var _dv = document.createElement('div');
+	    var _s1 = document.createElement('span');
+	    _s1.style.cssText = 'font-size:14px;font-weight:500;color:var(--text-main);';
+	    _s1.textContent = '投喂诊断文件';
+	    var _s2 = document.createElement('span');
+	    _s2.style.cssText = 'display:block;font-size:12px;color:var(--text-muted);margin-top:4px;';
+	    _s2.textContent = '拖拽 .xlsx / .xls 到此处，或点击浏览';
+	    _dv.appendChild(_s1); _dv.appendChild(_s2);
+	    drop.appendChild(_sv); drop.appendChild(_dv);
+	  }
+	  // Hide all step panels
+	  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.add('hidden');});
+	  // Hide stats
+	  var ss = document.getElementById('statsSection');
+	  if (ss) ss.classList.add('hidden');
+	  // Show timeline
+	  var tl = document.getElementById('agentTimeline');
+	  if (tl) tl.style.display = '';
+	  // Reset timeline cards
+	  ['cardRead','cardBrand','cardCate','cardFinish'].forEach(function(id){
+	    var c = document.getElementById(id); if (c) { c.style.display = 'none'; c.classList.remove('done','active'); }
+	    var conn = document.getElementById('conn'+id.replace('card','')); if (conn) conn.style.display = 'none';
+	  });
+	  var tlAction = document.getElementById('tlAction'); if (tlAction) tlAction.style.display = 'none';
+	  // Navigate
+	  navigateToStep('upload');
+	};
+
+	document.addEventListener('click', function(e) {
+	  var menu = document.getElementById('sessionMenu');
+	  var sw = document.getElementById('breadcrumbSession');
+	  if (menu && menu.classList.contains('show') && sw && !sw.contains(e.target)) {
+	    menu.classList.remove('show');
+	  }
+	});
+
+	/* ── Bat Agent ── */
+	(function() {
+	  var _batState = { emotion: 'idle', anchorElement: null, returnTimeout: null };
+	  var autoFlyEnabled = false;
+
+	  function setEmotion(emo) { _batState.emotion = emo; bat.className = 'bat-container ' + emo; }
+
+	  function flyTo(targetEl, speech, ox, oy) {
+	    /* Freeze current position BEFORE removing idle class, to prevent flash to (0,0) */
+	    var cr = bat.getBoundingClientRect();
+	    bat.style.position = 'absolute';
+	    bat.style.bottom = 'auto';
+	    bat.style.right = 'auto';
+	    bat.style.left = (cr.left + window.scrollX) + 'px';
+	    bat.style.top = (cr.top + window.scrollY) + 'px';
+
+	    setEmotion('flying');
+	    var pop = document.getElementById('batSpeech'); if (pop) pop.style.opacity = '0';
+	    _batState.anchorElement = targetEl;
+	    setTimeout(function() {
+	      var r = targetEl.getBoundingClientRect();
+	      bat.style.left = (r.left + window.scrollX + (ox || 0)) + 'px';
+	      bat.style.top = (r.top + window.scrollY + (oy || 0)) + 'px';
+	      setTimeout(function() {
+	        setEmotion('mischievous');
+	        if (speech) {
+	          var pop2 = document.getElementById('batSpeech');
+	          if (pop2) { pop2.textContent = ''; var sp = document.createElement('span'); sp.textContent = speech; pop2.appendChild(sp); pop2.style.opacity = '1'; }
+	        }
+	      }, 850);
+	    }, 50);
+	  }
+
+	  function flyToElement(selector, speech, ox, oy) {
+	    var target = document.querySelector(selector);
+	    if (target) flyTo(target, speech, ox, oy);
+	  }
+
+	  function flyHome() {
+	    /* Freeze current position before removing idle class */
+	    var cr = bat.getBoundingClientRect();
+	    bat.style.position = 'absolute';
+	    bat.style.bottom = 'auto';
+	    bat.style.right = 'auto';
+	    bat.style.left = (cr.left + window.scrollX) + 'px';
+	    bat.style.top = (cr.top + window.scrollY) + 'px';
+
+	    setEmotion('flying');
+	    var pop = document.getElementById('batSpeech'); if (pop) pop.style.opacity = '0';
+	    _batState.anchorElement = null;
+	    bat.style.left = (window.innerWidth - 80) + 'px';
+	    bat.style.top = (window.innerHeight - 80) + 'px';
+	    setTimeout(function() {
+	      bat.removeAttribute('style');
+	      bat.className = 'bat-container idle';
+	      var pop2 = document.getElementById('batSpeech');
+	      if (pop2) { pop2.textContent = '我是Klaus，可以问我任何问题'; pop2.style.opacity = '1'; }
+	    }, 850);
+	  }
+
+	  function wakeAssistant() {
+	    var console = document.getElementById('bottomConsole');
+	    if (!console) return;
+	    var ct = document.getElementById('consoleText');
+	    var text;
+	    if (!window.diagnosisData) {
+	      text = '请先上传诊断文件，我会自动帮你分析品牌和分类';
+	    } else {
+	      var clusters = window.diagnosisData.brand_clusters || [];
+	      var missing = clusters.filter(function(c) { return c.type !== 'valid'; }).length;
+	      var nb = (window.newBrands || []).length;
+	      if (missing || nb) {
+	        text = '发现 ' + missing + ' 个待审品牌和 ' + nb + ' 条新品牌候选，需要我帮你分析吗？';
+	      } else {
+	        text = '当前没有待处理项 ✨ 有什么可以帮你的？';
+	      }
+	    }
+	    if (ct) ct.textContent = text;
+	    /* Console opens first (400ms transition), bat flies once positioned */
+	    console.classList.add('show');
+	    flyTo(console, 'Klaus在此候命 ✨', 12, -45);
+	    setTimeout(function() {
+	      var input = document.getElementById('userConsoleInput');
+	      if (input) input.focus({ preventScroll: true });
+	    }, 450);
+	  }
+
+	  function _handleConsoleEnter(input) {
+	    var text = input.value.trim();
+	    if (!text) return;
+	    input.value = '';
+	    var ct = document.getElementById('consoleText');
+	    var actionRe = /^(分析|处理|执行|检查|修复|审核|导出|帮我)/;
+	    if (actionRe.test(text)) {
+	      if (ct) ct.textContent = '已创建 Agent 会话，正在处理...';
+	      window._dispatchToAgent && window._dispatchToAgent(text);
+	    } else {
+	      /* Quick chat via Agent API, reply in console */
+	      if (ct) ct.textContent = '...';
+	      _batQuickChat(text);
+	    }
+	  }
+
+	  function _batQuickChat(text) {
+	    // Placeholder: send to Agent chat API, show reply in console text
+	    var ct = document.getElementById('consoleText');
+	    if (!ct) return;
+	    ct.textContent = '已发送: ' + text + '（Agent API 连接中...）';
+	  }
+
+	  var bat;
+	  /* Defer init until DOM is ready — bat HTML comes after the script tag */
+	  window.addEventListener('DOMContentLoaded', function() {
+	  bat = document.getElementById('batAgent');
+	  if (!bat) return;
+
+	  /* click bat → toggle console */
+	  bat.addEventListener('click', function(e) {
+	    e.stopPropagation();
+	    var console = document.getElementById('bottomConsole');
+	    if (!console) return;
+	    if (console.classList.contains('show')) {
+	      console.classList.remove('show');
+	      flyHome();
+	    } else {
+	      wakeAssistant();
+	    }
+	  });
+
+	  /* track eyes */
+	  document.addEventListener('mousemove', function(e) {
+	    if (_batState.emotion === 'flying') return;
+	    var r = bat.getBoundingClientRect();
+	    var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+	    var angle = Math.atan2(e.clientY - cy, e.clientX - cx);
+	    var dist = Math.min(3, Math.hypot(e.clientX - cx, e.clientY - cy) / 50);
+	    var px = Math.cos(angle) * dist, py = Math.sin(angle) * dist;
+	    var pl = document.getElementById('pupilLeft'), pr = document.getElementById('pupilRight');
+	    if (pl) pl.style.transform = 'translate(' + px + 'px, ' + py + 'px)';
+	    if (pr) pr.style.transform = 'translate(' + px + 'px, ' + py + 'px)';
+	  });
+
+	  /* clicked elsewhere → dismiss console + fly home */
+	  document.addEventListener('click', function(e) {
+	    var c = document.getElementById('bottomConsole');
+	    if (c && c.classList.contains('show') && !c.contains(e.target) && !bat.contains(e.target)) {
+	      c.classList.remove('show');
+	      if (_batState.anchorElement) flyHome();
+	    }
+	  });
+
+	  /* declarative hover via BAT_TIPS config (cruise toggle gate) */
+	  document.addEventListener('mouseover', function(e) {
+	    if (!autoFlyEnabled || _batState.emotion === 'flying') return;
+	    var tipEl = null, sel = null;
+	    for (var s in BAT_TIPS) {
+	      var el = document.querySelector(s);
+	      if (el && el.contains(e.target)) { tipEl = el; sel = s; break; }
+	    }
+	    if (!tipEl) return;
+	    var cfg = BAT_TIPS[sel] || {};
+	    var tip = cfg.tip || '';
+	    if (!tip) return;
+	    if (_batState.returnTimeout) { clearTimeout(_batState.returnTimeout); _batState.returnTimeout = null; }
+	    if (tipEl !== _batState.anchorElement) {
+	      flyTo(tipEl, tip, cfg.ox || 0, cfg.oy || -12);
+	    }
+	  });
+	  document.addEventListener('mouseout', function(e) {
+	    if (!autoFlyEnabled) return;
+	    var tipEl = null;
+	    for (var s in BAT_TIPS) {
+	      var el = document.querySelector(s);
+	      if (el && el.contains(e.target)) { tipEl = el; break; }
+	    }
+	    if (!tipEl || _batState.anchorElement !== tipEl) return;
+	    if (_batState.returnTimeout) clearTimeout(_batState.returnTimeout);
+	    _batState.returnTimeout = setTimeout(function() { flyHome(); }, 3500);
+	  });
+
+	  /* cruise toggle button */
+	  var cruiseBtn = document.getElementById('btnAutoFlyToggle');
+	  if (cruiseBtn) {
+	    cruiseBtn.addEventListener('click', function(e) {
+	      e.stopPropagation();
+	      autoFlyEnabled = !autoFlyEnabled;
+	      if (autoFlyEnabled) {
+	        cruiseBtn.classList.add('active');
+	        cruiseBtn.textContent = '🦇 自动巡航: 开';
+	        var sp = document.getElementById('batSpeech');
+	        if (sp) { sp.textContent = ''; var s1=document.createElement('span');s1.textContent='自动巡航开启 🚀';sp.appendChild(s1);var br=document.createElement('br');sp.appendChild(br);var s2=document.createElement('span');s2.textContent='我会跟着您的鼠标飞往各个卡片解说！';sp.appendChild(s2); }
+	      } else {
+	        cruiseBtn.classList.remove('active');
+	        cruiseBtn.textContent = '🦇 自动巡航: 关';
+	        var sp = document.getElementById('batSpeech');
+	        if (sp) { sp.textContent = ''; var s3=document.createElement('span');s3.textContent='自动巡航已关闭';sp.appendChild(s3); }
+	        flyHome();
+	      }
+	    });
+	  }
+
+	  /* expose */
+	  window.BatController = { setEmotion: setEmotion, flyTo: flyTo, flyToElement: flyToElement, flyHome: flyHome, wakeAssistant: wakeAssistant };
+
+	  /* console input → Enter to send */
+	  var input = document.getElementById('userConsoleInput');
+	  if (input) {
+	    input.addEventListener('keydown', function(e) {
+	      if (e.key === 'Enter') _handleConsoleEnter(input);
+	    });
+	  }
+	  });
+	})();
+
+	/* ── Card select ── */
+	(function() {
+	  document.addEventListener('click', function(e) {
+	    var card = e.target.closest('.brand-group-item, .audit-card, .tl-card, .stat-card, .tree-node-row');
+	    if (!card) return;
+	    var was = card.classList.contains('card-selected');
+	    document.querySelectorAll('.card-selected').forEach(function(el) { el.classList.remove('card-selected'); });
+	    if (!was) card.classList.add('card-selected');
+	  });
+	})();
+	})();
+</script>
+
+<!-- ═══ Bat Agent SVG ═══ -->
+<div class="bat-container idle" id="batAgent">
+  <div class="bat-popover" id="batSpeech"><span>我是智能小智 🦇<br>点击我可以询问 AI</span></div>
+  <svg viewBox="0 0 64 64" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+    <path class="bat-wing-left" d="M29 36 C20 33, 10 24, 6 25 C2 26, 12 40, 20 44 C24 46, 28 41, 29 36 Z" fill="#2E2F38" stroke="#1E1F24" stroke-width="1.5" stroke-linejoin="round"/>
+    <path class="bat-wing-right" d="M35 36 C44 33, 54 24, 58 25 C62 26, 52 40, 44 44 C40 46, 36 41, 35 36 Z" fill="#2E2F38" stroke="#1E1F24" stroke-width="1.5" stroke-linejoin="round"/>
+    <ellipse cx="32" cy="38" rx="13" ry="15" fill="#24252E" stroke="#1E1F24" stroke-width="1.5"/>
+    <polygon points="23,28 17,14 26,24" fill="#24252E" stroke="#1E1F24" stroke-width="1.5" stroke-linejoin="round"/>
+    <polygon points="41,28 47,14 38,24" fill="#24252E" stroke="#1E1F24" stroke-width="1.5" stroke-linejoin="round"/>
+    <circle cx="32" cy="28" r="11" fill="#2E2F38" stroke="#1E1F24" stroke-width="1.5"/>
+    <circle cx="28" cy="27" r="4.5" fill="#FFFFFF"/>
+    <circle class="bat-pupil" id="pupilLeft" cx="28" cy="27" r="2.2" fill="#1C1D24"/>
+    <circle cx="29.2" cy="25.8" r="0.8" fill="#FFFFFF"/>
+    <circle cx="36" cy="27" r="4.5" fill="#FFFFFF"/>
+    <circle class="bat-pupil" id="pupilRight" cx="36" cy="27" r="2.2" fill="#1C1D24"/>
+    <circle cx="37.2" cy="25.8" r="0.8" fill="#FFFFFF"/>
+    <path d="M29 33 Q32 36 35 33" stroke="#1E1F24" stroke-width="1.2" fill="none"/>
+    <polygon points="30.5,33.5 31,35.5 31.5,33.5" fill="#FFFFFF"/>
+    <polygon points="32.5,33.5 33,35.5 33.5,33.5" fill="#FFFFFF"/>
+  </svg>
+</div>
+
+<!-- ═══ Bottom sheet console ═══ -->
+<div class="bottom-sheet-console" id="bottomConsole">
+  <div class="console-prompt-text">
+    <span class="spark-icon">✨</span>
+    <span id="consoleText">有什么可以帮你的？</span>
+  </div>
+  <div class="console-input-row">
+    <button class="btn-token secondary" id="btnAutoFlyToggle" title="鼠标悬浮时小智是否自动飞往解说面板">🦇 自动巡航: 关</button>
+    <input type="text" class="user-reply-input" id="userConsoleInput" placeholder="输入指令或提问...">
+  </div>
+</div>
+
+<script>
+console.log("_testLargeStart:", window._testLargeStart); console.log("_testLargeEnd:", window._testLargeEnd);
+console.log("[WINDOW-KEYS] toggle:", Object.getOwnPropertyDescriptor(window, "toggleSessionMenu"));
+console.log("[TEST] toggleSessionMenu:", typeof toggleSessionMenu);
+console.log("[TEST] _newSession:", typeof _newSession);
+console.log("[TEST] showGroupManager:", typeof showGroupManager);
+console.log("[TEST] electronSwitchGroup:", typeof electronSwitchGroup);
+</script>
+
+</body>
+</html>

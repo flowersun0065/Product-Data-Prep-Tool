@@ -320,9 +320,13 @@ class CategoryDetector:
                 item['variant_paths'] = list(info['marketing_paths'])
             all_codes.append(item)
 
-        # ── 8. 为缺失商品智能推荐分类 ──
-        if entity_dict and missing_codes:
-            for item in missing_codes:
+        # ── 8. 为缺失商品和纯营销商品智能推荐分类（纯营销 = 无有效标准路径） ──
+        need_recommend = []
+        for item in missing_codes + pure_marketing_codes:
+            if item.get('name'):
+                need_recommend.append(item)
+        if entity_dict and need_recommend:
+            for item in need_recommend:
                 suggested, confidence, factors = CategoryDetector.suggest_category(
                     item.get('name', ''), cleaned_tree,
                     cleaned_paths, entity_dict
@@ -332,10 +336,10 @@ class CategoryDetector:
                     item['suggested_confidence'] = confidence
                     item['factors'] = factors
             # 同步到 all_codes
-            missing_code_set = {m['code'] for m in missing_codes if m.get('suggested_path')}
+            recommend_codes = {m['code'] for m in need_recommend if m.get('suggested_path')}
             for ac in all_codes:
-                if ac['code'] in missing_code_set:
-                    for mi in missing_codes:
+                if ac['code'] in recommend_codes:
+                    for mi in need_recommend:
                         if mi['code'] == ac['code'] and mi.get('suggested_path'):
                             ac['suggested_path'] = mi['suggested_path']
                             ac['suggested_confidence'] = mi.get('suggested_confidence', 0)

@@ -931,69 +931,7 @@ REVIEW_TEMPLATE = '''
 '''
 
 
-# ── Electron Layout Templates ──
-
-SIDEBAR_TEMPLATE = """
-<div class="sidebar">
-  <div class="sidebar-header">
-    <select id="sidebarGroupSelect" onchange="switchGroup(this.value)">
-      <option value="">-- 选择分组 --</option>
-    </select>
-  </div>
-  <div class="sidebar-nav">
-    <div class="sidebar-section">当前会话</div>
-    <div id="sidebarSessionSteps"></div>
-
-    <div class="sidebar-section">品牌库</div>
-    <div class="sidebar-item" data-page="brand-database" onclick="navigateTo('brand-database')">
-      📋 品牌数据库
-    </div>
-    <div class="sidebar-item" data-page="brand-corrections" onclick="navigateTo('brand-corrections')">
-      ✏️ 品牌修正记录
-    </div>
-    <div class="sidebar-item" data-page="brand-relationships" onclick="navigateTo('brand-relationships')">
-      🔗 品牌关系
-    </div>
-
-    <div class="sidebar-section">分类体系</div>
-    <div class="sidebar-item" data-page="category-tree" onclick="navigateTo('category-tree')">
-      🌳 分类路径树
-    </div>
-    <div class="sidebar-item" data-page="category-classify" onclick="navigateTo('category-classify')">
-      🏷 路径分类标记
-    </div>
-    <div class="sidebar-item" data-page="category-corrections" onclick="navigateTo('category-corrections')">
-      📝 分类修正记录
-    </div>
-
-    <div class="sidebar-section">历史会话</div>
-    <div id="sidebarHistory"></div>
-  </div>
-  <div class="sidebar-footer" onclick="openSettings()">
-    ⚙ 设置
-  </div>
-</div>
-"""
-
-TAB_BAR_TEMPLATE = """
-<div class="tab-bar">
-  <div class="tab-item active" data-tab="upload" onclick="switchTab('upload')">
-    1 上传 & 诊断
-  </div>
-  <div class="tab-item" data-tab="brand-review" onclick="switchTab('brand-review')">
-    2 品牌审核
-  </div>
-  <div class="tab-item" data-tab="ai-process" onclick="switchTab('ai-process')">
-    3 AI 处理
-  </div>
-  <div class="tab-item" data-tab="review" onclick="switchTab('review')">
-    4 复核
-  </div>
-  <div class="tab-item" data-tab="export" onclick="switchTab('export')">
-    5 导出
-  </div>
-</div>
-"""
+# ── Electron Layout Template (single, correct version) ──
 
 ELECTRON_LAYOUT = """
 <!DOCTYPE html>
@@ -1005,105 +943,347 @@ ELECTRON_LAYOUT = """
   <link rel="stylesheet" href="/static/css/native.css">
 </head>
 <body>
-  <!-- Title bar (draggable) -->
-  <div class="title-bar">产品数据清洗工具</div>
-
-  <div class="app-layout">
-    <div id="sidebarContainer"></div>
-    <div class="main-content">
-      <div id="tabBarContainer"></div>
-      <div class="tab-content" id="tabContent">
-        <!-- Upload & Diagnosis -->
-        <div id="panel-upload" class="tab-panel">
-          <div id="uploadSection"></div>
-          <div id="diagnosisSection" class="hidden"></div>
-          <div id="progressSection" class="hidden"></div>
-        </div>
-        <!-- Brand Review -->
-        <div id="panel-brand-review" class="tab-panel hidden">
-          <div id="brandReviewContainer" style="padding:16px;"></div>
-        </div>
-        <!-- AI Process -->
-        <div id="panel-ai-process" class="tab-panel hidden">
-          <div id="aiProcessContainer" style="padding:16px;"></div>
-        </div>
-        <!-- Review -->
-        <div id="panel-review" class="tab-panel hidden">
-          <div id="reviewContainer" style="padding:16px;"></div>
-        </div>
-        <!-- Export -->
-        <div id="panel-export" class="tab-panel hidden">
-          <div id="exportContainer" style="padding:16px;"></div>
-        </div>
-
-        <!-- Sidebar pages (not in tab flow) -->
-        <div id="panel-brand-database" class="page-content hidden">
-          <div style="padding:16px;">
-            <h2 style="margin-bottom:12px;font-size:14px;font-weight:600;">品牌数据库</h2>
-            <div id="brandDatabaseContent"></div>
-          </div>
-        </div>
-        <div id="panel-brand-corrections" class="page-content hidden">
-          <div style="padding:16px;">
-            <h2 style="margin-bottom:12px;font-size:14px;font-weight:600;">品牌修正记录</h2>
-            <div id="brandCorrectionsContent"></div>
-          </div>
-        </div>
-        <div id="panel-brand-relationships" class="page-content hidden">
-          <div style="padding:16px;">
-            <h2 style="margin-bottom:12px;font-size:14px;font-weight:600;">品牌关系</h2>
-            <div id="brandRelationshipsContent"></div>
-          </div>
-        </div>
-        <div id="panel-category-tree" class="page-content hidden">
-          <div style="padding:16px;display:flex;gap:12px;">
-            <div style="width:320px;" id="categoryTreeContainer"></div>
-            <div style="flex:1;" id="categoryTreeRight"></div>
-          </div>
-        </div>
-        <div id="panel-category-classify" class="page-content hidden">
-          <div style="padding:16px;">
-            <h2 style="margin-bottom:12px;font-size:14px;font-weight:600;">路径分类标记</h2>
-            <div id="categoryClassifyContent"></div>
-          </div>
-        </div>
-        <div id="panel-category-corrections" class="page-content hidden">
-          <div style="padding:16px;">
-            <h2 style="margin-bottom:12px;font-size:14px;font-weight:600;">分类修正记录</h2>
-            <div id="categoryCorrectionsContent"></div>
-          </div>
-        </div>
+  <aside class="island-panel sidebar" id="electronSidebar">
+    <div class="sidebar-top">
+      <div class="window-dots">
+        <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
       </div>
+      <div class="group-select-row">
+        <select class="group-select" id="electronGroupSelect" onchange="electronSwitchGroup(this.value)"><option value="">-- 选择分组 --</option></select>
+        <button class="group-select-add" onclick="showGroupManager()" title="新建分组">+</button>
+      </div>
+      <div class="nav-section">
+        <div class="section-title">当前会话</div>
+        <div class="nav-item" data-step="upload"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>上传 & 诊断</span></div>
+        <div class="nav-item" data-step="brand-review"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>品牌审核</span></div>
+        <div class="nav-item" data-step="category-review"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>分类审核</span></div>
+        <div class="nav-item" data-step="ai-process"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>AI 处理</span></div>
+        <div class="nav-item" data-step="review"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>复核</span></div>
+        <div class="nav-item" data-step="export"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>导出</span></div>
+      </div>
+      <div class="nav-section"><div class="section-title">品牌库</div>
+        <div class="nav-item" data-page="brand-database" onclick="navigateToSidebar('brand-database')"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>品牌数据库</span></div>
+        <div class="nav-item" data-page="brand-corrections" onclick="navigateToSidebar('brand-corrections')"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>品牌修正记录</span></div>
+      </div>
+      <div class="nav-section"><div class="section-title">分类体系</div>
+        <div class="nav-item" data-page="category-tree" onclick="navigateToSidebar('category-tree')"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>分类路径树</span></div>
+        <div class="nav-item" data-page="category-classify" onclick="navigateToSidebar('category-classify')"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><span>路径分类标记</span></div>
+      </div>
+      <div class="nav-section"><div class="section-title">历史会话</div><div id="electronHistory"></div></div>
     </div>
+    <div class="sidebar-bottom"><span onclick="electronOpenSettings()" style="cursor:pointer;">设置</span></div>
+  </aside>
+
+  <main class="main-area" id="electronMainContent">
+    <div class="breadcrumb"><span id="breadcrumbPrev">上传 & 诊断</span><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg><span class="cur" id="breadcrumbCur"></span></div>
+    {body_content}
+    <div id="panel-review" class="tab-panel hidden"><div id="reviewContainer" style="padding:16px;"></div></div>
+    <div id="panel-export" class="tab-panel hidden"><div id="exportContainer" style="padding:16px;"></div></div>
+  </main>
+
+  <div id="_panelStorage" style="display:none;"></div>
+  <div class="rc-columns-wrapper" id="rcColumnsWrapper">
+    <div class="right-column" id="rightColumn"></div>
+    <div class="right-column" id="rightColumn2"></div>
   </div>
 
-  <!-- Shared detail panel -->
+  <div id="exportPreviewModal" class="export-modal"><div class="export-modal-overlay" onclick="closeExportPreview()"></div><div class="export-modal-content bg-slate-800 border border-slate-700"><h3 class="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">导出到品牌库</h3><p class="text-sm text-slate-400 mb-3">以下 <span id="exportCount" class="text-brand-400 font-bold">0</span> 个品牌将合并到品牌库：</p><div class="overflow-y-auto max-h-[40vh] mb-4 bg-slate-900 rounded-lg p-3 border border-slate-700/50" id="exportPreviewList"></div><div class="flex justify-end gap-2"><button onclick="closeExportPreview()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm text-slate-200">取消</button><button onclick="confirmExportToLibrary()" class="px-4 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded text-sm font-medium text-white shadow-sm">确认导出</button></div></div></div>
+  <div id="addBrandModal" class="export-modal"><div class="export-modal-overlay" onclick="closeAddBrandModal()"></div><div class="export-modal-content" style="width:450px;"><h3 class="text-lg font-bold text-brand-400 mb-4">添加/编辑品牌</h3><div class="space-y-4"><div><label class="block text-sm text-slate-400 mb-1">品牌名称 (必填)</label><input type="text" id="modalBrandName" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white focus:border-brand-500 outline-none" placeholder="例如: 乐事/Lay&apos;s"></div><div><label class="block text-sm text-slate-400 mb-1">品牌类型</label><div class="flex gap-1"><div id="modalBrandTypeContainer" class="flex-1" style="position:relative"><input type="text" id="modalBrandType" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" placeholder="加载中..." autocomplete="off"><div id="modalBrandTypeList" class="brand-dropdown-list" style="width:100%"></div></div><button onclick="manageBrandTypes()" class="px-2 py-1 bg-slate-600 hover:bg-slate-500 rounded text-sm" title="管理类型">⚙</button></div></div><div><label class="block text-sm text-slate-400 mb-1">国家/地区</label><div class="flex gap-1"><div id="modalBrandCountryContainer" class="flex-1" style="position:relative"><input type="text" id="modalBrandCountry" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" placeholder="加载中..." autocomplete="off"><div id="modalBrandCountryList" class="brand-dropdown-list" style="width:100%"></div></div><button onclick="manageCountries()" class="px-2 py-1 bg-slate-600 hover:bg-slate-500 rounded text-sm" title="管理国家">⚙</button></div></div><div id="modalParentBrandRow"><label class="block text-sm text-slate-400 mb-1">关联主品牌（可选）</label><div id="modalParentBrandContainer" style="position:relative"><input type="text" id="modalParentBrand" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" placeholder="不关联..." autocomplete="off"><div id="modalParentBrandList" class="brand-dropdown-list" style="width:100%;display:none;"></div></div><div id="modalRelationType" class="flex gap-4 mt-1.5" style="display:none;"><label class="text-sm text-slate-400 flex items-center gap-1.5 cursor-pointer" onclick="document.getElementById('relationSubBrand').checked=true"><input type="radio" name="relation" id="relationSubBrand" value="sub_brand" checked class="accent-brand-500"> 子品牌</label><label class="text-sm text-slate-400 flex items-center gap-1.5 cursor-pointer" onclick="document.getElementById('relationAlias').checked=true"><input type="radio" name="relation" id="relationAlias" value="alias" class="accent-brand-500"> 别名</label></div></div><div class="flex gap-2 pt-2"><button onclick="closeAddBrandModal()" class="flex-1 py-2 bg-slate-600 hover:bg-slate-500 rounded font-bold">取消</button><button onclick="submitNewBrandFromModal()" class="flex-1 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded font-bold">确认添加</button></div></div></div></div>
+  <div id="brandConfigModal" class="export-modal"><div class="export-modal-overlay" onclick="closeBrandConfigModal()"></div><div class="export-modal-content" style="width:500px;"><h3 id="brandConfigModalTitle" class="text-lg font-bold text-brand-400 mb-4">管理</h3><div id="brandConfigList" class="max-h-60 overflow-y-auto mb-4 space-y-1 text-sm"></div><div class="flex gap-2"><input type="text" id="brandConfigNewInput" class="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white text-sm" placeholder="输入新类型名称..."><button onclick="submitBrandConfigNew()" class="px-4 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded text-sm font-bold">+ 新增</button></div></div></div>
+  <div id="categoryPickerModal" class="export-modal"><div class="export-modal-overlay" onclick="closePickerModal()"></div><div class="export-modal-content" style="width:500px;"><h3 class="text-lg font-bold text-brand-400 mb-4">设置分类</h3><input type="text" id="pickerSearch" placeholder="搜索分类..." class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-sm mb-3" oninput="filterPickerTree(this.value)" autocomplete="off"><div id="pickerTreeContainer" class="max-h-64 overflow-y-auto border border-slate-700/50 rounded p-2 mb-3"></div><div id="pickerSelectedDisplay" class="text-xs text-slate-400 mb-3 min-h-[20px]"></div><div class="flex gap-2 justify-end"><button onclick="closePickerModal()" class="px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded text-sm">取消</button><button id="pickerConfirmBtn" onclick="confirmPickerSelection()" class="px-4 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded text-sm font-bold" disabled>确认</button></div></div></div>
+
   <div id="detailOverlay" class="detail-overlay" onclick="closeDetail()"></div>
-  <div id="detailPanel" class="detail-panel">
-    <div id="detailContent"></div>
-  </div>
+  <div id="detailPanel" class="detail-panel"><div id="detailContent"></div></div>
 
+  <script>window._electronMode = true;</script>
   <script src="/static/js/common.js"></script>
-  <script src="/static/js/sidebar.js"></script>
   <script src="/static/js/detail-panel.js"></script>
   <script src="/static/js/upload.js"></script>
   <script src="/static/js/diagnosis.js"></script>
   <script src="/static/js/brand_editor.js"></script>
   <script src="/static/js/ai_process.js"></script>
-  <script src="/static/js/review.js"></script>
   <script src="/static/js/export.js"></script>
+  <script src="/static/js/review.js"></script>
   <script src="/static/js/brand-library.js"></script>
   <script src="/static/js/category-tree.js"></script>
   <script>
-    // Initialize Electron layout
-    document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('sidebarContainer').innerHTML = {sidebar};
-      document.getElementById('tabBarContainer').innerHTML = {tab_bar};
-      if (typeof initSidebar === 'function') initSidebar();
-      if (typeof initTabBar === 'function') initTabBar();
-      if (typeof loadGroups === 'function') loadGroups();
-    });
-  </script>
+(function(){
+var STEP_LABEL={'upload':'上传 & 诊断','brand-review':'品牌审核','category-review':'分类审核','ai-process':'AI 处理','review':'复核','export':'导出'};
+var PAGE_SECTION={'brand-database':'品牌库','brand-corrections':'品牌库','category-tree':'分类体系','category-classify':'分类体系'};
+var PAGE_LABEL={'brand-database':'品牌数据库','brand-corrections':'品牌修正记录','category-tree':'分类路径树','category-classify':'路径分类标记'};
+var ICONS={
+  done:'<svg class="status-icon done" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>',
+  pending:'<svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>',
+  active:'<svg class="status-icon active" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/></svg>',
+  processing:'<svg class="status-icon processing" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>',
+  failed:'<svg class="status-icon failed" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>'
+};
+var _current=null;
+
+function H(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ── Right-column panel helpers ──
+var _rcResize={active:false,startX:0,startW:0,startY:0,startH:0,target:null};
+
+function _chooseColumn(){
+  var c1=document.getElementById('rightColumn'),c2=document.getElementById('rightColumn2');
+  var n1=c1.querySelectorAll('.panel-card').length,n2=c2.querySelectorAll('.panel-card').length;
+  if(n1<2)return c1;if(n2<2)return c2;return c2;
+}
+function _balanceColumns(){
+  var c1=document.getElementById('rightColumn'),c2=document.getElementById('rightColumn2');
+  var cards1=c1.querySelectorAll('.panel-card'),cards2=c2.querySelectorAll('.panel-card');
+  if(cards1.length<2&&cards2.length>0){c1.appendChild(cards2[cards2.length-1]);}
+  _refreshAll();
+}
+function _refreshAll(){
+  var c1=document.getElementById('rightColumn'),c2=document.getElementById('rightColumn2');
+  var n1=c1.querySelectorAll('.panel-card').length,n2=c2.querySelectorAll('.panel-card').length;
+  var w=document.getElementById('rcColumnsWrapper');
+  w.classList.toggle('open',n1+n2>0);
+  if(n2>0){c2.classList.add('open');}else{c2.classList.remove('open');}
+  if(n1>0){c1.classList.add('open');}else if(n2===0){c1.classList.remove('open');}
+  var handle=w.querySelector('.rc-col-resize-handle');
+  if(n2>0){
+    if(!handle){
+      handle=document.createElement('div');handle.className='rc-col-resize-handle';
+      handle.addEventListener('mousedown',function(e){
+        var c1w=c1.offsetWidth,c2w=c2.offsetWidth;
+        _rcResize.active=true;_rcResize.target='col-resize';
+        _rcResize._c1=c1;_rcResize._c2=c2;
+        _rcResize._startW1=c1w;_rcResize._startW2=c2w;
+        _rcResize.startX=e.clientX;handle.classList.add('active');e.preventDefault();
+      });
+      c1.after(handle);
+    }
+    handle.classList.add('visible');
+  }else if(handle){handle.classList.remove('visible');}
+  c1.querySelectorAll('.panel-card').forEach(function(c){c.style.flex='1 1 0';});
+  c2.querySelectorAll('.panel-card').forEach(function(c){c.style.flex='1 1 0';});
+  _refreshPanelHandles();_initRCSize();
+}
+
+function _movePanelToCard(panelId,cardId,title){
+  var card=document.querySelector('[data-panel="'+cardId+'"]');
+  if(!card){
+    var col=_chooseColumn();
+    card=document.createElement('div');card.className='panel-card';
+    card.setAttribute('data-panel',cardId);
+    card.innerHTML='<div class="panel-card-header"><span class="panel-card-title">'+title+'</span><button class="panel-card-close" onclick="window._closePanelCard(\\''+cardId+'\\',\\''+panelId+'\\')">&times;</button></div><div class="panel-card-body"></div>';
+    col.appendChild(card);
+  }
+  var t=card.querySelector('.panel-card-title');if(t)t.textContent=title;
+  var body=card.querySelector('.panel-card-body');
+  var panel=document.getElementById(panelId);
+  if(panel){
+    panel.style.cssText='position:relative;width:100%;height:auto;right:auto;top:auto;box-shadow:none;z-index:auto;display:block;overflow-y:auto;max-height:100%;';
+    body.appendChild(panel);
+  }
+  _refreshAll();return body;
+}
+window._movePanelToCard=_movePanelToCard;
+window._closePanelCard=function(cardId,panelId){
+  var card=document.querySelector('[data-panel="'+cardId+'"]');
+  if(card){
+    var panel=document.getElementById(panelId);
+    if(panel){panel.style.cssText='';var s=document.getElementById('_panelStorage');if(s)s.appendChild(panel);}
+    card.remove();
+  }
+  _balanceColumns();_refreshAll();
+};
+
+function _initRCSize(){
+  var c1=document.getElementById('rightColumn');
+  if(!c1||c1.querySelector('.rc-resize-handle'))return;
+  var h=document.createElement('div');h.className='rc-resize-handle';
+  h.addEventListener('mousedown',function(e){
+    _rcResize.active=true;_rcResize.target=c1;_rcResize.startX=e.clientX;_rcResize.startW=c1.offsetWidth;
+    h.classList.add('active');e.preventDefault();
+  });
+  c1.appendChild(h);
+}
+function _refreshPanelHandles(){
+  [document.getElementById('rightColumn'),document.getElementById('rightColumn2')].forEach(function(rc){
+    if(!rc)return;
+    rc.querySelectorAll('.panel-resize-handle').forEach(function(h){h.remove();});
+    var cards=rc.querySelectorAll('.panel-card');if(cards.length<2)return;
+    for(var i=0;i<cards.length-1;i++){
+      var handle=document.createElement('div');handle.className='panel-resize-handle';
+      (function(idx,col){handle.addEventListener('mousedown',function(e){
+        var a=col.querySelectorAll('.panel-card')[idx],b=col.querySelectorAll('.panel-card')[idx+1];
+        _rcResize.active=true;_rcResize.target='panel';_rcResize._cardA=a;_rcResize._cardB=b;
+        _rcResize._startHA=a.offsetHeight;_rcResize._startHB=b.offsetHeight;
+        _rcResize.startY=e.clientY;handle.classList.add('active');e.preventDefault();
+      });})(i,rc);
+      cards[i].after(handle);
+    }
+  });
+}
+document.addEventListener('mousemove',function(e){
+  if(!_rcResize.active)return;
+  if(_rcResize.target==='col-resize'){
+    var dx=e.clientX-_rcResize.startX;
+    var w1=_rcResize._startW1+dx,w2=_rcResize._startW2-dx;
+    if(w1<200){w1=200;w2=_rcResize._startW1+_rcResize._startW2-200;}
+    if(w2<200){w2=200;w1=_rcResize._startW1+_rcResize._startW2-200;}
+    _rcResize._c1.style.width=w1+'px';_rcResize._c2.style.width=w2+'px';
+  }else if(_rcResize.target&&_rcResize.target!=='panel'){
+    var w=_rcResize.startW-(e.clientX-_rcResize.startX);
+    if(w<280)w=280;if(w>window.innerWidth*0.55)w=window.innerWidth*0.55;
+    _rcResize.target.style.width=w+'px';
+  }else if(_rcResize.target==='panel'){
+    var dy=e.clientY-_rcResize.startY;
+    var a=_rcResize._cardA,b=_rcResize._cardB;
+    var ha=_rcResize._startHA+dy,hb=_rcResize._startHB-dy;
+    if(ha<80){ha=80;hb=_rcResize._startHA+_rcResize._startHB-80;}
+    if(hb<80){hb=80;ha=_rcResize._startHA+_rcResize._startHB-80;}
+    a.style.flex='0 0 '+ha+'px';b.style.flex='0 0 '+hb+'px';
+  }
+});
+document.addEventListener('mouseup',function(){
+  if(!_rcResize.active)return;_rcResize.active=false;
+  document.querySelectorAll('.rc-resize-handle.active,.panel-resize-handle.active,.rc-col-resize-handle.active').forEach(function(h){h.classList.remove('active');});
+});
+_initRCSize();
+
+// ── Navigation ──
+function updateBreadcrumb(){
+  if(!_current)return;
+  var p=document.getElementById('breadcrumbPrev'),c=document.getElementById('breadcrumbCur');
+  if(_current.type==='page'){p.textContent=PAGE_SECTION[_current.id]||'';c.textContent=PAGE_LABEL[_current.id]||_current.id;}
+  else{p.textContent=STEP_LABEL[_current.id]||'';c.textContent='';}
+}
+function highlightSidebar(){
+  document.querySelectorAll('.nav-item[data-step],.nav-item[data-page]').forEach(function(el){
+    var match=(_current&&_current.type==='step'&&el.getAttribute('data-step')===_current.id)||(_current&&_current.type==='page'&&el.getAttribute('data-page')===_current.id);
+    el.classList.toggle('active',match);
+  });
+}
+
+function showStepContent(step){
+  var up=document.getElementById('uploadSection'),di=document.getElementById('diagnosisSection');
+  var ss=document.getElementById('statsSection'),ps=document.getElementById('progressSection');
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.add('hidden');});
+  if(step==='upload'){if(up)up.style.display='';if(di)di.classList.add('hidden');}
+  else if(step==='review'||step==='export'){if(up)up.style.display='none';if(di)di.classList.add('hidden');if(ss)ss.style.display='none';if(ps)ps.style.display='none';}
+  else{if(up)up.style.display='none';if(di)di.classList.remove('hidden');if(ss)ss.style.display='none';if(ps)ps.style.display='none';filterSubsections(step);}
+  document.querySelectorAll('[id^="pagePanel-"]').forEach(function(p){p.style.display='none';});
+}
+
+function filterSubsections(step){
+  var bp=document.getElementById('brandPanel'),mc=document.getElementById('mainContent'),cp=document.getElementById('categoryPanel'),ac=document.getElementById('aiConfigPanel'),ap=document.getElementById('aiProgressSection');
+  var all=(step==='upload');
+  if(bp)bp.style.display=(step==='brand-review'||all)?'':'none';
+  if(mc)mc.style.display=(step==='brand-review'||all)?'':'none';
+  if(cp)cp.style.display=(step==='category-review'||all)?'':'none';
+  if(ac)ac.style.display=(step==='ai-process'||all)?'':'none';
+  if(ap)ap.style.display=(step==='ai-process'||all)?'':'none';
+}
+
+function showPagePanel(page){
+  var up=document.getElementById('uploadSection'),di=document.getElementById('diagnosisSection');
+  if(up)up.style.display='none';if(di)di.classList.add('hidden');
+  document.querySelectorAll('[id^="pagePanel-"]').forEach(function(p){p.style.display='none';});
+  var pid='pagePanel-'+page,panel=document.getElementById(pid);
+  if(!panel){
+    panel=document.createElement('div');panel.id=pid;
+    panel.style.cssText='flex:1;overflow-y:auto;padding:20px';
+    var main=document.getElementById('electronMainContent'),bc=main.querySelector('.breadcrumb');
+    main.insertBefore(panel,bc.nextSibling);
+    if(page==='brand-database'){panel.innerHTML='<div id="brandDatabaseContent" style="padding:20px;"></div>';setTimeout(function(){if(typeof renderBrandDatabase==='function')renderBrandDatabase();},50);}
+    else if(page==='category-tree'){
+      panel.innerHTML='<div style="padding:16px;display:flex;flex-direction:column;gap:10px;height:100%;">'+
+        '<div style="display:flex;gap:8px;">'+
+        '<input id="pageCateTreeSearch" placeholder="搜索分类路径..." oninput="filterCategoryTreePage(this.value)" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel);color:var(--text-main);font-size:12px;outline:none;">'+
+        '<input id="pageProductSearch" placeholder="搜商品名/编码..." oninput="searchProductPage(this.value)" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel);color:var(--text-main);font-size:12px;outline:none;">'+
+        '<button id="pageToggleMktBtn" onclick="toggleMarketingPage()" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--panel);color:var(--text-sub);cursor:pointer;font-size:11px;white-space:nowrap;">隐藏营销</button></div>'+
+        '<div id="pageProductSearchResults" style="display:none;max-height:200px;overflow-y:auto;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;"></div>'+
+        '<div id="pageCateTreeContainer" style="flex:1;overflow-y:auto;"></div></div>';
+      setTimeout(function(){if(typeof renderCategoryTreePage==='function')renderCategoryTreePage();},50);
+    }
+    else if(page==='category-classify'){panel.innerHTML='<div id="categoryClassifyContent" style="padding:20px;"></div>';setTimeout(function(){if(typeof _renderClassifyPage==='function')_renderClassifyPage();},50);}
+    else if(page==='brand-corrections'){panel.innerHTML='<div id="brandCorrectionsContent" style="padding:20px;"></div>';setTimeout(function(){if(typeof _renderBrandCorrectionsPage==='function')_renderBrandCorrectionsPage();},50);}
+    else {panel.innerHTML='<div style="padding:40px;text-align:center;color:var(--text-muted)"><p style="font-size:16px;font-weight:500;margin-bottom:8px">'+(PAGE_LABEL[page]||page)+'</p><p style="font-size:12px">功能将在后续任务中激活</p></div>';}
+  }
+  panel.style.display='';
+}
+
+function navigateToStep(step){
+  _current={type:'step',id:step};
+  highlightSidebar();showStepContent(step);updateBreadcrumb();
+  if(step==='review'&&typeof sessionId!=='undefined'&&sessionId){
+    var panel=document.getElementById('panel-review');if(panel)panel.classList.remove('hidden');
+    var rc=document.getElementById('reviewContainer');if(!rc)return;
+    rc.innerHTML='<div style="text-align:center;color:var(--text-muted);padding:40px;">加载复核数据...</div>';
+    fetch('/review?embed=1').then(function(r){return r.text()}).then(function(html){
+      rc.innerHTML=html;
+      var app=rc.querySelector('#review-app');if(app){app.classList.remove('h-screen');app.style.height='100%';}
+      if(typeof window.initReview==='function')window.initReview();
+    }).catch(function(e){rc.innerHTML='<p style="color:var(--red);padding:20px;">加载失败: '+e.message+'</p>';});
+  }
+  if(step==='export'){}
+}
+
+function navigateToSidebar(page){
+  _current={type:'page',id:page};
+  highlightSidebar();showPagePanel(page);updateBreadcrumb();
+}
+
+// ── Status icons ──
+function setStepIconHTML(step,status){
+  var el=document.querySelector('.nav-item[data-step="'+step+'"] .status-icon');
+  if(el){var w=document.createElement('span');w.innerHTML=ICONS[status]||ICONS.pending;el.parentNode.replaceChild(w.firstChild,el);}
+}
+function setStepDone(step){setStepIconHTML(step,'done');}
+function setStepActive(step){setStepIconHTML(step,'active');}
+function setStepProcessing(step){setStepIconHTML(step,'processing');}
+function setStepFailed(step){setStepIconHTML(step,'failed');}
+
+// ── Groups & history ──
+function loadGroups(){
+  fetch('/api/groups').then(function(r){return r.json()}).then(function(d){
+    var s=document.getElementById('electronGroupSelect');if(!s)return;var c=s.value;
+    s.innerHTML='<option value="">-- 选择分组 --</option>';
+    Object.entries(d.groups||{}).forEach(function(e){s.innerHTML+='<option value="'+e[0]+'">'+H(e[1].name)+'</option>';});
+    var g=localStorage.getItem('last_group_id')||'';s.value=c||g;
+    var u=document.getElementById('uploadGroup');if(u&&g)u.value=g;
+  }).catch(function(){});
+}
+
+function renderHistory(){
+  var e=document.getElementById('electronHistory');if(!e)return;
+  fetch('/api/recent_files').then(function(r){return r.json()}).then(function(f){
+    e.innerHTML=(f||[]).slice(0,5).map(function(x){
+      return '<div class="nav-item" style="font-size:11px" onclick="window._loadHistoryFile(\\''+x.id+'\\')"><svg class="status-icon pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>'+((x.time||'').split(' ')[0])+' | '+((x.name||'').substring(0,22))+'</div>';
+    }).join('');
+  }).catch(function(){});
+}
+window._loadHistoryFile=function(fid){if(typeof importRecentFile==='function')importRecentFile(fid);navigateToStep('upload');};
+
+function switchGroup(g){localStorage.setItem('last_group_id',g);var u=document.getElementById('uploadGroup');if(u)u.value=g;renderHistory();}
+
+// ── Init ──
+document.querySelectorAll('.nav-item[data-step]').forEach(function(el){
+  el.addEventListener('click',function(){navigateToStep(el.getAttribute('data-step'));});
+  el.style.cursor='pointer';
+});
+
+loadGroups();renderHistory();
+
+// Hide web header if injected
+var oldHeader=document.querySelector('#electronMainContent > header');
+if(oldHeader)oldHeader.style.display='none';
+
+navigateToStep('upload');
+
+window.electronSwitchGroup=switchGroup;
+window.electronOpenSettings=function(){if(window.electronAPI)window.electronAPI.openSettings();else window.open('/settings','_blank');};
+window.navigateToSidebar=navigateToSidebar;
+window.navigateToStep=navigateToStep;
+window.setStepDone=setStepDone;window.setStepActive=setStepActive;
+window.setStepProcessing=setStepProcessing;window.setStepFailed=setStepFailed;
+})();
+</script>
 </body>
 </html>
 """

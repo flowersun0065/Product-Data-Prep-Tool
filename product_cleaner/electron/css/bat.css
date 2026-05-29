@@ -1,0 +1,112 @@
+/* ══════════════════════════════════════════════════════════════
+   bat.css — 蝙蝠助手专用样式（仅工作流模式）
+
+   native.css 已有 bat 容器/翅膀/瞳孔/气泡基础样式，
+   本文件补充霓虹光晕、按钮、加载动画。
+   所有 CSS 变量使用 native.css 中确有的变量。
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── 控制台弹出光晕 ──
+   z-index:-1 在 Electron 多层容器中被屏蔽，改为 box-shadow 方案 */
+
+.bottom-sheet-console.show {
+  box-shadow:
+    0 0 15px rgba(59,130,246,0.12),
+    0 0 35px rgba(139,92,246,0.08),
+    0 0 60px rgba(245,158,11,0.06),
+    0 4px 20px rgba(0,0,0,0.08);
+  animation: bat-aura-pulse 2.5s infinite ease-in-out;
+}
+
+@keyframes bat-aura-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 15px rgba(59,130,246,0.12),
+      0 0 35px rgba(139,92,246,0.08),
+      0 0 60px rgba(245,158,11,0.06),
+      0 4px 20px rgba(0,0,0,0.08);
+  }
+  50% {
+    box-shadow:
+      0 0 25px rgba(59,130,246,0.2),
+      0 0 50px rgba(139,92,246,0.14),
+      0 0 80px rgba(245,158,11,0.1),
+      0 6px 28px rgba(0,0,0,0.12);
+  }
+}
+
+/* ── spark 图标 ── */
+.spark-icon { color: var(--accent); font-size: 14px; }
+
+/* ── 控制台按钮（毛玻璃 + accent 高亮） ── */
+.btn-token {
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-token.primary {
+  background: #1E1F24;
+  color: #fff;
+}
+.btn-token.primary:hover {
+  opacity: 0.95;
+}
+
+.btn-token.secondary {
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--text-sub);
+  border: 1px solid var(--border);
+}
+.btn-token.secondary.active {
+  background: rgba(37,99,235,0.12);
+  color: var(--accent);
+  border-color: rgba(59,130,246,0.25);
+}
+
+/* ── AI 加载遮罩（品牌审核卡片上） ── */
+.ai-card-loader {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255,255,255,0.85);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.ai-card-loader.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(59,130,246,0.1);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 6px;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}
+
+.ai-loader-text {
+  font-size: 11px;
+  color: var(--text-sub);
+  font-weight: 500;
+}

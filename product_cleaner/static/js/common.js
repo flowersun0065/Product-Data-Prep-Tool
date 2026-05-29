@@ -1,17 +1,17 @@
-let sessionId = null;
-let diagnosisData = null;
-let brandRules = {};  // 已保存的规则 {code: {brand, no_brand, skipped}}
+var sessionId = null;
+var diagnosisData = null;
+var brandRules = {};  // 已保存的规则 {code: {brand, no_brand, skipped}}
 let categoryRules = {}; // 分类规则 {code: {action, replacement}}
 let marketingTags = {}; // 营销标记 {code: [paths]}
 let categoryOptions = { level1: [], level2_by_level1: {}, level3_by_level2: {} };
-let newBrands = [];   // 用户添加的新品牌
+var newBrands = [];   // 用户添加的新品牌
 let currentPanelData = null;  // 当前弹窗的数据
 let currentPanelPage = 1;
 let currentPanelFilter = '';
 const ITEMS_PER_PAGE = 20;
 
 // 品牌库（从后端获取）
-let brandDatabase = [];
+var brandDatabase = [];
 
 // 分组分页状态
 let groupPagination = {
