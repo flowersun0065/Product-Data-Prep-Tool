@@ -283,6 +283,17 @@
         nameEl.textContent = item.name || code || '';
         li.appendChild(nameEl);
 
+        // 商品缩略图
+        if (item.org_image_url) {
+          var thumb = document.createElement('img');
+          thumb.src = item.org_image_url;
+          thumb.alt = item.name || '';
+          thumb.style.cssText = 'width:60px;height:60px;object-fit:cover;border-radius:4px;border:1px solid var(--border);margin-top:6px;cursor:pointer;display:block;';
+          thumb.addEventListener('error', function() { this.style.display = 'none'; });
+          thumb.addEventListener('click', function(e) { e.stopPropagation(); _showImagePreview(item.org_image_url, item.name || ''); });
+          li.appendChild(thumb);
+        }
+
         // Spec grid: code + row
         var sg = document.createElement('div');
         sg.className = 'meta-spec-grid';
@@ -310,7 +321,7 @@
           sugLabel.style.cssText = 'margin-bottom:6px;display:flex;align-items:center;gap:6px;';
           var sugBadge = document.createElement('span');
           sugBadge.className = 'badge-flat grn';
-          sugBadge.textContent = inAll ? '已确认分类(与现有路径一致)' : '建议分类(新分类参考)';
+          sugBadge.textContent = inAll ? '建议路径(与原始一致)' : '建议分类(新分类参考)';
           sugLabel.appendChild(sugBadge);
           sugGrid.appendChild(sugLabel);
 
@@ -524,6 +535,22 @@
   };
   // 废弃：_emCatPickL1Changed, _emCatPickL2Changed, _emConfirmCategoryPick
   // 内联 L1/L2/L3 select picker 已删除，统一使用 #categoryPickerModal 的树形选择器
+
+  // ── 图片预览 ──
+  window._showImagePreview = function(url, name) {
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:10000;display:flex;align-items:center;justify-content:center;cursor:pointer;';
+    overlay.addEventListener('click', function() { overlay.remove(); });
+
+    var img = document.createElement('img');
+    img.src = url;
+    img.alt = name || '';
+    img.style.cssText = 'max-width:90vw;max-height:85vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);';
+    img.addEventListener('click', function(e) { e.stopPropagation(); });  // 不关
+    overlay.appendChild(img);
+
+    document.body.appendChild(overlay);
+  };
 
   // Init
   setTimeout(initCategoryTabs, 200);

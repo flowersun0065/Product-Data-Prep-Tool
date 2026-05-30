@@ -314,7 +314,8 @@ class CategoryDetector:
                 'marketing_paths': list(info['marketing_paths']),
                 'standard_paths': list(info['standard_paths']),
                 '_section': sec,
-                'row': info['rows'][0]
+                'row': info['rows'][0],
+                'org_image_url': info.get('org_image_url', '')
             }
             if info['marketing_paths'] and info['standard_paths']:
                 item['variant_paths'] = list(info['marketing_paths'])

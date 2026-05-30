@@ -11,7 +11,7 @@ from typing import Dict, Tuple, Optional
 
 from ..brands.database import BRAND_DATABASE_V6, find_any_brand
 from ..brands.patterns import SLASH_BRAND_PATTERNS
-from .product_parser import SpecExtractor, similarity
+from .product_parser import SpecExtractor, similarity, strip_not_brand_words
 
 
 class BrandConsistencyChecker:
@@ -277,6 +277,12 @@ class BrandConsistencyChecker:
                     br = find_any_brand(candidate)
                     if br['found']:
                         return br['sub_brand_name'] if br['match_type'] == 'sub_brand' else br['standard_name'], 0.85
+                    # 候选不在品牌库 → 去掉非品牌词再查一次
+                    stripped = strip_not_brand_words(candidate)
+                    if stripped != candidate and len(stripped) >= 2:
+                        br = find_any_brand(stripped)
+                        if br['found']:
+                            return br['sub_brand_name'] if br['match_type'] == 'sub_brand' else br['standard_name'], 0.85
                     return candidate, 0.85
 
         # 第 3 层：模糊匹配（使用哈希索引加速）

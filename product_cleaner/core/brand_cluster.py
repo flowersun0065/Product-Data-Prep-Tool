@@ -160,6 +160,11 @@ class BrandClusterEngine:
                             if rest != remaining:
                                 if not rest or len(rest) < 2 or rest in NOT_BRAND_WORDS:
                                     extracted = None
+                        # 剥离后得到更短的品牌候选 -> 查品牌库
+                        if extracted and remaining != extracted:
+                            br = find_brand_by_name_fast(remaining) or find_sub_brand_fast(remaining)
+                            if br:
+                                extracted = remaining
 
                 item = {
                     'code': code,

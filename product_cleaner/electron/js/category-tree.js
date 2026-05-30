@@ -95,15 +95,16 @@ async function renderCategoryTreePage() {
   options.level1.forEach(function(l1) {
     var l2s = options.level2_by_level1[l1] || [];
     var l1Node = _buildTreeNode(l1, 'indent-1', true/*bold*/);
+    l1Node.dataset.l1 = l1;
     var l1Children = document.createElement('div');
-    l1Children.className = 'tree-children';
+    l1Children.className = 'tree-children hidden';
     var hasL2 = false;
 
     l2s.forEach(function(l2) {
       var l3s = options.level3_by_level2[l1 + ' > ' + l2] || [];
       var l2Node = _buildTreeNode(l2, 'indent-2', false/*not bold*/);
       var l2Children = document.createElement('div');
-      l2Children.className = 'tree-children';
+      l2Children.className = 'tree-children hidden';
       var hasL3 = false;
 
       // L2 summary badge
@@ -212,23 +213,59 @@ async function renderCategoryTreePage() {
     container.appendChild(fragment);
   }
 
-  // Auto-expand + scroll to last active path
+  // 自动展开 + 滚动到上次操作路径（支持 L1 / L1>L2 / L1>L2>L3 三级）
   if (_pgLastActivePath && container) {
-    var l3Row = container.querySelector('[data-path="' + _pgLastActivePath.replace(/"/g, '&quot;') + '"]');
-    if (l3Row) {
-      var l2Node = l3Row.closest('.tree-node');
-      var l1Node = l2Node ? l2Node.parentElement.closest('.tree-node') : null;
-      [l1Node, l2Node].forEach(function(node) {
-        if (node) {
-          var children = node.querySelector('.tree-children');
-          if (children && children.classList.contains('hidden')) {
-            children.classList.remove('hidden');
-            var arrow = node.querySelector('.arrow-icon');
-            if (arrow) arrow.classList.remove('collapsed');
+    var parts = _pgLastActivePath.split(' > ');
+    var targetRow = null;
+    // 需展开的 tree-node 列表
+    var expandNodes = [];
+
+    if (parts.length === 1) {
+      // L1 级别：找到对应的一级节点
+      var l1Node = container.querySelector('.tree-node[data-l1="' + parts[0].replace(/"/g, '&quot;') + '"]');
+      if (l1Node) {
+        targetRow = l1Node.querySelector('.tree-node-row');
+        expandNodes.push(l1Node);
+      }
+    } else if (parts.length === 2) {
+      // L1 > L2：展开 L1，找到 L2 行
+      var l1Node = container.querySelector('.tree-node[data-l1="' + parts[0].replace(/"/g, '&quot;') + '"]');
+      if (l1Node) {
+        expandNodes.push(l1Node);
+        var l2Rows = l1Node.querySelectorAll('.indent-2');
+        for (var i = 0; i < l2Rows.length; i++) {
+          if (l2Rows[i].textContent.indexOf(parts[1]) === 0) {
+            targetRow = l2Rows[i];
+            var l2Node = targetRow.closest('.tree-node');
+            if (l2Node) expandNodes.push(l2Node);
+            break;
           }
         }
-      });
-      l3Row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } else {
+      // L1 > L2 > L3：通过 data-path 定位
+      targetRow = container.querySelector('[data-path="' + _pgLastActivePath.replace(/"/g, '&quot;') + '"]');
+      if (targetRow) {
+        var l2Node = targetRow.closest('.tree-node');
+        var l1Node = l2Node ? l2Node.parentElement.closest('.tree-node') : null;
+        if (l1Node) expandNodes.push(l1Node);
+        if (l2Node) expandNodes.push(l2Node);
+      }
+    }
+
+    // 展开所有需要的节点
+    expandNodes.forEach(function(node) {
+      var children = node.querySelector('.tree-children');
+      if (children && children.classList.contains('hidden')) {
+        children.classList.remove('hidden');
+        var arrow = node.querySelector('.arrow-icon');
+        if (arrow) arrow.classList.remove('collapsed');
+      }
+    });
+
+    // 滚动到目标行
+    if (targetRow) {
+      targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }
 }

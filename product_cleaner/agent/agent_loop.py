@@ -32,7 +32,10 @@ SYSTEM_PROMPT = """你是一个数据处理系统的 AI 助手。你有以下工
 
 每次只调一个工具。调完工具后，我看结果再决定下一步。
 
-如果你认为不需要调工具，直接回复用户。
+回复格式（必须是纯 JSON）：
+- 调工具：{{"tool": "工具名", "arguments": {{"参数": "值"}}}}
+- 直接回复：{{"reply": "你的回复内容"}}
+
 如果你认为需要用户确认，直接告诉用户，不要擅自执行。
 """
 
@@ -86,13 +89,13 @@ def call_tool_loop(llm_call: Callable[[str], str],
             # 不是 JSON，当做自然语言回复 → 结束
             return {"reply": reply, "actions": all_actions}
 
-        tool_name = parsed.get("tool")
+        tool_name = parsed.get("tool") or parsed.get("action")
         if not tool_name:
             # LLM 决定直接回复
             return {"reply": parsed.get("reply", reply), "actions": all_actions}
 
         # LLM 要调工具
-        tool_args = parsed.get("arguments", {})
+        tool_args = parsed.get("arguments") or parsed.get("parameters") or {}
 
         # 自动注入 session_id
         if session_id and "session_id" not in tool_args:

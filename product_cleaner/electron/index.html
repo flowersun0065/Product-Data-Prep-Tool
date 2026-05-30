@@ -689,7 +689,7 @@ function _movePanelToCard(panelId,cardId,title){
   var body=card.querySelector('.panel-card-body');
   var panel=document.getElementById(panelId);
   if(panel&&panel.parentNode!==body){
-    panel.style.cssText='position:relative;width:100%;height:auto;right:auto;top:auto;background:transparent;border:0;border-radius:0;padding:0;box-shadow:none;z-index:auto;display:flex;flex-direction:column;overflow:hidden;max-height:100%;';
+    panel.style.cssText='position:relative;width:100%;height:auto;right:auto;top:auto;background:transparent;border:0;border-radius:0;padding:0;box-shadow:none;z-index:auto;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;max-height:100%;';
     panel.classList.remove('hidden');
     body.appendChild(panel);
     var ih=panel.querySelector('#sidePanelInternalHeader');if(ih)ih.style.display='none';
@@ -903,14 +903,17 @@ function renderHistory(){ console.log('[DEBUG] renderHistory called');
       name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
       var gname = s.group_name || '';
       name.textContent = (gname ? gname + '/' : '') + (_cleanFileName(s.file_name) || _cleanFileName(s.display_name) || s.session_id).substring(0, 28);
+      var time = document.createElement('span');
+      time.style.cssText = 'display:block;font-size:9px;color:var(--text-muted);';
+      time.textContent = (s.created || '').replace('T', ' ').substring(0, 16);
       var del = document.createElement('span');
       del.style.cssText = 'color:var(--red);font-size:10px;opacity:0;margin-left:4px;flex-shrink:0;cursor:pointer;';
       del.textContent = '\u2715';
-      del.onclick = (function(sid){return function(ev){ev.stopPropagation();_deleteSession(sid);setTimeout(function(){renderHistory();},200);};})(s.session_id);
+      del.onclick = (function(sid){return function(ev){ev.stopPropagation();_deleteSession(sid);};})(s.session_id);
       item.onclick = function(){_switchSession(s.session_id);};
       item.onmouseover = function(){del.style.opacity='1';};
       item.onmouseout = function(){del.style.opacity='0';};
-      item.appendChild(name); item.appendChild(del); e.appendChild(item);
+      item.appendChild(name); item.appendChild(time); item.appendChild(del); e.appendChild(item);
     });
   }).catch(function(){});
 	}
@@ -974,6 +977,16 @@ document.querySelectorAll('.nav-item[data-step]').forEach(function(el){
 	      // Hide/show group-select-row based on mode
 	      var grpRow = document.querySelector('.group-select-row');
 	      if (grpRow) grpRow.style.display = key === 'workflow' ? '' : 'none';
+	      // Hide/show workflow panels when switching to Agent
+	      var rc = document.getElementById('rcColumnsWrapper');
+	      var sp = document.getElementById('sidePanel');
+	      if (key === 'agent') {
+	        if (rc) rc.style.display = 'none';
+	        if (sp) sp.style.display = 'none';
+	      } else {
+	        if (rc) rc.style.display = '';
+	        if (sp) sp.style.display = '';
+	      }
 	    });
 	  });
 	})();
@@ -1008,7 +1021,7 @@ console.log('[AFTER-ASSIGN] toggleSessionMenu type:', typeof window.toggleSessio
 	      var item = document.createElement('div');
 	      item.className = 'context-item';
 	      var name = document.createElement('span'); name.className = 'ctx-name'; name.textContent = _cleanFileName(s.display_name) || _cleanFileName(s.file_name) || s.session_id;
-	      var time = document.createElement('span'); time.className = 'ctx-time'; time.textContent = (s.created || '').substring(0, 10);
+	      var time = document.createElement('span'); time.className = 'ctx-time'; time.textContent = (s.created || '').replace('T', ' ').substring(0, 16);
 	      var del = document.createElement('span'); del.className = 'ctx-del'; del.textContent = '✕';
 	      del.onclick = (function(sid) { return function(e) { e.stopPropagation(); _deleteSession(sid); }; })(s.session_id);
 	      item.appendChild(name); item.appendChild(time); item.appendChild(del);
@@ -1063,18 +1076,22 @@ console.log('[AFTER-ASSIGN] toggleSessionMenu type:', typeof window.toggleSessio
 	async function _deleteSession(sid) {
 	  if (!confirm('确定删除这个会话？')) return;
 	  try {
-	    await fetch('/api/session/delete', {
+	    var res = await fetch('/api/session/delete', {
 	      method: 'POST', headers: { 'Content-Type': 'application/json' },
 	      body: JSON.stringify({ session_id: sid })
 	    });
+	    var data = await res.json();
+	    if (!data.success) { alert('删除失败'); return; }
 	    if (typeof sessionId !== 'undefined' && sessionId === sid) {
 	      sessionId = ''; window.sessionId = '';
 	      var sw = document.getElementById('breadcrumbSession');
 	      if (sw) sw.textContent = '选择会话';
 	    }
-	    var menu = document.getElementById('sessionMenu');
-	    if (menu && menu.classList.contains('show')) _loadSessionMenu(menu);
 	  } catch(e) { alert('删除失败: ' + e.message); }
+	  // 删除后刷新历史和菜单
+	  renderHistory();
+	  var menu = document.getElementById('sessionMenu');
+	  if (menu) _loadSessionMenu(menu);
 	}
 
 	window._updateBreadcrumbSession = function(text) {
@@ -1138,13 +1155,12 @@ console.log('[AFTER-ASSIGN] toggleSessionMenu type:', typeof window.toggleSessio
 	});
 
 	/* ── Bat Agent ── */
-	(function() {
+  (function() {
 	  var _batState = { emotion: 'idle', anchorElement: null, returnTimeout: null };
-	  var autoFlyEnabled = false;
 
 	  function setEmotion(emo) { _batState.emotion = emo; bat.className = 'bat-container ' + emo; }
 
-	  function flyTo(targetEl, speech, ox, oy) {
+	  function flyTo(targetEl, speech, ox, oy, _hintRect) {
 	    /* Freeze current position BEFORE removing idle class, to prevent flash to (0,0) */
 	    var cr = bat.getBoundingClientRect();
 	    bat.style.position = 'absolute';
@@ -1157,9 +1173,15 @@ console.log('[AFTER-ASSIGN] toggleSessionMenu type:', typeof window.toggleSessio
 	    var pop = document.getElementById('batSpeech'); if (pop) pop.style.opacity = '0';
 	    _batState.anchorElement = targetEl;
 	    setTimeout(function() {
-	      var r = targetEl.getBoundingClientRect();
-	      bat.style.left = (r.left + window.scrollX + (ox || 0)) + 'px';
-	      bat.style.top = (r.top + window.scrollY + (oy || 0)) + 'px';
+	      var r = _hintRect || targetEl.getBoundingClientRect();
+	      var tx = r.left + window.scrollX + (ox || 0);
+	      var ty = r.top + window.scrollY + (oy || 0);
+	      /* Pure clamp with bubble margins (bubble: ~130px above, ~170px right of bat) */
+	      var batW = 64, batH = 64, bubbleTop = 130, bubbleRight = 170;
+	      tx = Math.max(window.scrollX, Math.min(window.scrollX + window.innerWidth - batW - bubbleRight, tx));
+	      ty = Math.max(window.scrollY + bubbleTop, Math.min(window.scrollY + window.innerHeight - batH, ty));
+	      bat.style.left = tx + 'px';
+	      bat.style.top = ty + 'px';
 	      setTimeout(function() {
 	        setEmotion('mischievous');
 	        if (speech) {
@@ -1197,27 +1219,60 @@ console.log('[AFTER-ASSIGN] toggleSessionMenu type:', typeof window.toggleSessio
 	    }, 850);
 	  }
 
+	  function _getAssistantText() {
+	    if (!window.diagnosisData) return '请先上传诊断文件，我会自动帮你分析品牌和分类';
+	    var clusters = window.diagnosisData.brand_clusters || [];
+	    var miss = clusters.filter(function(c) { return c.type === 'missing'; }).length;
+	    var mism = clusters.filter(function(c) { return c.type === 'mismatch'; }).length;
+	    var nb = (window.newBrands || []).length;
+	    var cur = _current || {};
+	    if (cur.type === 'page') {
+	      if (cur.id === 'brand-database') return '品牌数据库 — 可搜索、编辑、管理所有标准品牌';
+	      if (cur.id === 'brand-corrections') return '品牌修正记录 — 查看历史修正的品牌映射';
+	      if (cur.id === 'category-tree') return '分类路径树 — 浏览和标记标准/营销路径';
+	      if (cur.id === 'category-classify') return '路径分类标记 — 对路径归属进行分类确认';
+	      if (cur.id === 'variety-words') return '词库管理 — 维护品类词库和修饰词';
+	      return '有什么可以帮你的？';
+	    }
+	    if (cur.type === 'step') {
+	      if (cur.id === 'upload') return '请上传诊断文件开始分析';
+	      if (cur.id === 'brand-review') {
+	        var s = miss || mism ? '发现 ' + miss + ' 个缺失品牌、' + mism + ' 个品牌错误' : '品牌审核已完成 ✨';
+	        if (nb) s += '（' + nb + ' 条新品牌候选）';
+	        return s + '，需要我帮你分析吗？';
+	      }
+	    if (cur.id === 'category-review') {
+	      var conflictGroups = (window.diagnosisData && window.diagnosisData.conflict_groups) || [];
+	      return '当前有 ' + conflictGroups.length + ' 条待确认的分类路径，需要我帮你检查吗？';
+	    }
+	      if (cur.id === 'ai-process') return 'AI 处理 — 可批量调用 AI 对缺失项进行智能推断';
+	      if (cur.id === 'review') return '复核与导出 — 最终确认后导出清洗结果';
+	      if (cur.id === 'export') return '导出 — 将清洗结果打包下载';
+	      return '有什么可以帮你的？';
+	    }
+	    if (miss || mism || nb) {
+	      var s = '发现 ' + miss + ' 个缺失品牌、' + mism + ' 个品牌错误';
+	      if (nb) s += '（' + nb + ' 条新品牌候选）';
+	      return s + '，需要我帮你分析吗？';
+	    }
+	    return '当前没有待处理项 ✨ 有什么可以帮你的？';
+	  }
+	  window._getAssistantText = _getAssistantText;
+
 	  function wakeAssistant() {
 	    var console = document.getElementById('bottomConsole');
 	    if (!console) return;
 	    var ct = document.getElementById('consoleText');
-	    var text;
-	    if (!window.diagnosisData) {
-	      text = '请先上传诊断文件，我会自动帮你分析品牌和分类';
-	    } else {
-	      var clusters = window.diagnosisData.brand_clusters || [];
-	      var missing = clusters.filter(function(c) { return c.type !== 'valid'; }).length;
-	      var nb = (window.newBrands || []).length;
-	      if (missing || nb) {
-	        text = '发现 ' + missing + ' 个待审品牌和 ' + nb + ' 条新品牌候选，需要我帮你分析吗？';
-	      } else {
-	        text = '当前没有待处理项 ✨ 有什么可以帮你的？';
-	      }
-	    }
-	    if (ct) ct.textContent = text;
-	    /* Console opens first (400ms transition), bat flies once positioned */
+	    if (ct) ct.textContent = _getAssistantText();
+	    /* ... */
+	    console.style.transition = 'none';
 	    console.classList.add('show');
-	    flyTo(console, 'Klaus在此候命 ✨', 12, -45);
+	    var hintRect = console.getBoundingClientRect();
+	    console.classList.remove('show');
+	    console.offsetHeight; /* force layout */
+	    console.style.transition = '';
+	    console.classList.add('show');
+	    flyTo(console, 'Klaus在此候命 ✨', 12, -45, hintRect);
 	    setTimeout(function() {
 	      var input = document.getElementById('userConsoleInput');
 	      if (input) input.focus({ preventScroll: true });
@@ -1279,67 +1334,15 @@ console.log('[AFTER-ASSIGN] toggleSessionMenu type:', typeof window.toggleSessio
 	    if (pr) pr.style.transform = 'translate(' + px + 'px, ' + py + 'px)';
 	  });
 
-	  /* clicked elsewhere → dismiss console + fly home */
+	  /* clicked elsewhere (not bat, not console, not card) → dismiss console + fly home */
 	  document.addEventListener('click', function(e) {
 	    var c = document.getElementById('bottomConsole');
-	    if (c && c.classList.contains('show') && !c.contains(e.target) && !bat.contains(e.target)) {
-	      c.classList.remove('show');
-	      if (_batState.anchorElement) flyHome();
-	    }
+	    if (!c || !c.classList.contains('show')) return;
+	    if (c.contains(e.target) || bat.contains(e.target) ||
+	        e.target.closest('.brand-group-item, .audit-card, .tl-card, .stat-card, .tree-node-row, .cat-group-card')) return;
+	    c.classList.remove('show');
+	    if (_batState.anchorElement) flyHome();
 	  });
-
-	  /* declarative hover via BAT_TIPS config (cruise toggle gate) */
-	  document.addEventListener('mouseover', function(e) {
-	    if (!autoFlyEnabled || _batState.emotion === 'flying') return;
-	    var tipEl = null, sel = null;
-	    for (var s in BAT_TIPS) {
-	      var el = document.querySelector(s);
-	      if (el && el.contains(e.target)) { tipEl = el; sel = s; break; }
-	    }
-	    if (!tipEl) return;
-	    var cfg = BAT_TIPS[sel] || {};
-	    var tip = cfg.tip || '';
-	    if (!tip) return;
-	    if (_batState.returnTimeout) { clearTimeout(_batState.returnTimeout); _batState.returnTimeout = null; }
-	    if (tipEl !== _batState.anchorElement) {
-	      flyTo(tipEl, tip, cfg.ox || 0, cfg.oy || -12);
-	    }
-	  });
-	  document.addEventListener('mouseout', function(e) {
-	    if (!autoFlyEnabled) return;
-	    var tipEl = null;
-	    for (var s in BAT_TIPS) {
-	      var el = document.querySelector(s);
-	      if (el && el.contains(e.target)) { tipEl = el; break; }
-	    }
-	    if (!tipEl || _batState.anchorElement !== tipEl) return;
-	    if (_batState.returnTimeout) clearTimeout(_batState.returnTimeout);
-	    _batState.returnTimeout = setTimeout(function() { flyHome(); }, 3500);
-	  });
-
-	  /* cruise toggle button */
-	  var cruiseBtn = document.getElementById('btnAutoFlyToggle');
-	  if (cruiseBtn) {
-	    cruiseBtn.addEventListener('click', function(e) {
-	      e.stopPropagation();
-	      autoFlyEnabled = !autoFlyEnabled;
-	      if (autoFlyEnabled) {
-	        cruiseBtn.classList.add('active');
-	        cruiseBtn.textContent = '🦇 自动巡航: 开';
-	        var sp = document.getElementById('batSpeech');
-	        if (sp) { sp.textContent = ''; var s1=document.createElement('span');s1.textContent='自动巡航开启 🚀';sp.appendChild(s1);var br=document.createElement('br');sp.appendChild(br);var s2=document.createElement('span');s2.textContent='我会跟着您的鼠标飞往各个卡片解说！';sp.appendChild(s2); }
-	      } else {
-	        cruiseBtn.classList.remove('active');
-	        cruiseBtn.textContent = '🦇 自动巡航: 关';
-	        var sp = document.getElementById('batSpeech');
-	        if (sp) { sp.textContent = ''; var s3=document.createElement('span');s3.textContent='自动巡航已关闭';sp.appendChild(s3); }
-	        flyHome();
-	      }
-	    });
-	  }
-
-	  /* expose */
-	  window.BatController = { setEmotion: setEmotion, flyTo: flyTo, flyToElement: flyToElement, flyHome: flyHome, wakeAssistant: wakeAssistant };
 
 	  /* console input → Enter to send */
 	  var input = document.getElementById('userConsoleInput');
@@ -1348,20 +1351,108 @@ console.log('[AFTER-ASSIGN] toggleSessionMenu type:', typeof window.toggleSessio
 	      if (e.key === 'Enter') _handleConsoleEnter(input);
 	    });
 	  }
+
+	  /* _autoTip: fallback tip from card content */
 	  });
+
+	  function _autoTip(el) {
+	    var title = el.querySelector('.g-title, .card-subject, .tl-title, .stat-label, .node-name, .brand-item-name');
+	    var meta = el.querySelector('.g-meta, .stat-num, .card-brand-title');
+	    var txt = title ? title.textContent.replace(/\s+/g, ' ').trim() : '';
+	    if (meta) {
+	      var mt = meta.textContent.replace(/\s+/g, ' ').trim().substring(0, 60);
+	      if (mt) txt = txt ? txt + ' — ' + mt : mt;
+	    }
+	    return txt || null;
+	  }
+
+	  /* Bat follows clicked card (called from card-select IIFE) */
+	  window._batFollow = function(card, deselect) {
+	    if (deselect || !card) { flyHome(); return; }
+	    /* BAT_TIPS first, _autoTip fallback */
+	    var tip = null, ox = 0, oy = -12;
+	    for (var s in BAT_TIPS) {
+	      var el = document.querySelector(s);
+	      if (el && el === card) { tip = BAT_TIPS[s].tip; ox = BAT_TIPS[s].ox || 0; oy = BAT_TIPS[s].oy || -12; break; }
+	    }
+	    if (!tip) {
+	      tip = _autoTip(card);
+	      if (tip) {
+	        if (card.classList.contains('brand-group-item')) { ox = -35; oy = -45; }
+	        else if (card.classList.contains('tl-card')) { ox = 40; oy = -45; }
+	        else if (card.classList.contains('stat-card')) { ox = 0; oy = -50; }
+	        else if (card.classList.contains('cat-group-card')) { ox = -35; oy = -45; }
+	      }
+	    }
+	    if (tip) flyTo(card, tip, ox, oy);
+	  };
 	})();
 
-	/* ── Card select ── */
+	/* ── Cruise toggle: controls whether bat follows on card click ── */
+	var autoFlyEnabled = false;
+	window.addEventListener('DOMContentLoaded', function() {
+	  var cruiseBtn = document.getElementById('btnAutoFlyToggle');
+	  if (!cruiseBtn) return;
+	  cruiseBtn.addEventListener('click', function(e) {
+	    e.stopPropagation();
+	    autoFlyEnabled = !autoFlyEnabled;
+	    if (autoFlyEnabled) {
+	      cruiseBtn.classList.add('active');
+	      cruiseBtn.textContent = '🦇 自动巡航: 开';
+	    } else {
+	      cruiseBtn.classList.remove('active');
+	      cruiseBtn.textContent = '🦇 自动巡航: 关';
+	    }
+	  });
+	});
+
+	/* ── Card select + bat follow ── */
 	(function() {
 	  document.addEventListener('click', function(e) {
-	    var card = e.target.closest('.brand-group-item, .audit-card, .tl-card, .stat-card, .tree-node-row');
+	    var card = e.target.closest('.brand-group-item, .audit-card, .tl-card, .stat-card, .tree-node-row, .cat-group-card');
 	    if (!card) return;
+	    e.stopPropagation();
 	    var was = card.classList.contains('card-selected');
 	    document.querySelectorAll('.card-selected').forEach(function(el) { el.classList.remove('card-selected'); });
-	    if (!was) card.classList.add('card-selected');
+	    if (was) {
+	      window._selectedContext = null;
+	      if (typeof _batFollow === 'function') _batFollow(null, true);
+	    } else {
+	      card.classList.add('card-selected');
+	      var ctx = {};
+	      var title = card.querySelector('.g-title, .card-subject, .tl-title, .stat-label, .node-name, .brand-item-name');
+	      var meta = card.querySelector('.g-meta, .stat-num');
+	      if (card.classList.contains('brand-group-item')) ctx = { type: 'brand_group', name: title ? title.textContent.trim() : '' };
+	      else if (card.classList.contains('audit-card')) ctx = { type: 'audit_item', name: title ? title.textContent.trim() : '' };
+	      else if (card.classList.contains('tl-card')) ctx = { type: 'timeline_step', name: title ? title.textContent.trim() : '' };
+	      else if (card.classList.contains('stat-card')) ctx = { type: 'stat_card', name: title ? title.textContent.trim() : '', value: meta ? meta.textContent.trim() : '' };
+	      else if (card.classList.contains('tree-node-row')) ctx = { type: 'category_node', name: title ? title.textContent.trim() : '' };
+	      window._selectedContext = ctx;
+	      if (autoFlyEnabled && typeof _batFollow === 'function') _batFollow(card, false);
+	    }
 	  });
 	})();
 	})();
+	
+	/* Refresh console hint when navigating tabs */
+	var _origNavigateStep = navigateToStep;
+	navigateToStep = function(step) {
+	  _origNavigateStep(step);
+	  var c = document.getElementById('bottomConsole');
+	  var ct = document.getElementById('consoleText');
+	  if (c && ct && c.classList.contains('show') && window._getAssistantText) {
+	    ct.textContent = window._getAssistantText();
+	  }
+	};
+	var _origNavigateSidebar = navigateToSidebar;
+	navigateToSidebar = function(page) {
+	  _origNavigateSidebar(page);
+	  var c = document.getElementById('bottomConsole');
+	  var ct = document.getElementById('consoleText');
+	  if (c && ct && c.classList.contains('show') && window._getAssistantText) {
+	    ct.textContent = window._getAssistantText();
+	  }
+	};
 </script>
 
 <!-- ═══ Bat Agent SVG ═══ -->
