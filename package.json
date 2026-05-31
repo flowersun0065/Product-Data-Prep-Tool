@@ -7,11 +7,15 @@
     "start": "electron .",
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win"
+    "build:win": "electron-builder --win",
+    "build:ts": "vite build",
+    "dev:ts": "vite build --watch"
   },
   "devDependencies": {
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.14"
   },
   "dependencies": {
     "playwright": "^1.60.0"

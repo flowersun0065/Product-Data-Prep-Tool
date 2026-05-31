@@ -1289,17 +1289,9 @@ console.log('[AFTER-ASSIGN] toggleSessionMenu type:', typeof window.toggleSessio
 	      if (ct) ct.textContent = '已创建 Agent 会话，正在处理...';
 	      window._dispatchToAgent && window._dispatchToAgent(text);
 	    } else {
-	      /* Quick chat via Agent API, reply in console */
 	      if (ct) ct.textContent = '...';
-	      _batQuickChat(text);
+	      window._batQuickChat && window._batQuickChat(text);
 	    }
-	  }
-
-	  function _batQuickChat(text) {
-	    // Placeholder: send to Agent chat API, show reply in console text
-	    var ct = document.getElementById('consoleText');
-	    if (!ct) return;
-	    ct.textContent = '已发送: ' + text + '（Agent API 连接中...）';
 	  }
 
 	  var bat;
@@ -1498,5 +1490,6 @@ console.log("[TEST] showGroupManager:", typeof showGroupManager);
 console.log("[TEST] electronSwitchGroup:", typeof electronSwitchGroup);
 </script>
 
+<script src="/static/dist/bundle.js"></script>
 </body>
 </html>
