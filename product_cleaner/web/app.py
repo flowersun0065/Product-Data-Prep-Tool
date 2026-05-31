@@ -868,6 +868,24 @@ def finalize_review_async(session_id: str):
 
         _write_result_files(session_id, original_df, combined, code_col)
 
+        # 直接复核路径：review_file 包含全部条目（已确认 + 待复核），
+        # 让用户在复核页看到所有商品，用 review_status 区分状态。
+        if combined:
+            all_ai_df = pd.DataFrame(combined)
+            all_ai_df['code'] = all_ai_df['code'].astype(str)
+            if code_col and code_col in original_df.columns:
+                original_df[code_col] = original_df[code_col].astype(str)
+                full_review_df = (
+                    original_df.drop_duplicates(subset=code_col, keep='first')
+                    .merge(all_ai_df, left_on=code_col, right_on='code', how='inner')
+                )
+            else:
+                full_review_df = all_ai_df
+            if not full_review_df.empty:
+                review_file = RESULT_FOLDER / f"{session_id}_review_{uuid.uuid4().hex[:6]}.xlsx"
+                full_review_df.to_excel(str(review_file), index=False)
+                session['review_file'] = str(review_file)
+
         session['total'] = len(combined)
         session['status'] = 'completed'
         session['ai_phase'] = 'completed'
