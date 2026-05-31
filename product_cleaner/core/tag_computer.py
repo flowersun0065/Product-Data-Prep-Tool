@@ -3,7 +3,7 @@
 
 import re
 
-from ..brands.database import find_any_brand, BRAND_DATABASE_V6
+from ..brands.database import find_any_brand, BRAND_DATABASE_V6, _find_parent_brand
 
 # org_recommend_tag 中促销内容嵌在描述文本里，按格式提取
 _RECOMMEND_PROMO_RE = re.compile(
@@ -134,9 +134,9 @@ def compute_recommend_tag(category_path='') -> str:
 
 
 def compute_self_operated_tag(brand_name='') -> str:
-    """自营标签。品牌type==自有品牌 或 品牌为空。"""
+    """自营标签。品牌type==自有品牌。"""
     if not brand_name or not str(brand_name).strip():
-        return '自营'
+        return ''
 
     result = find_any_brand(str(brand_name).strip())
     if not result['found']:
@@ -147,10 +147,16 @@ def compute_self_operated_tag(brand_name='') -> str:
     if brand_info.get('type') == '自有品牌':
         return '自营'
 
+    # 子品牌：查父品牌 type
     if result['match_type'] == 'sub_brand':
         parent_info = BRAND_DATABASE_V6.get(std_name, {})
         if parent_info.get('type') == '自有品牌':
             return '自营'
+
+    # 品牌同时作为子品牌存在（如象大厨=主品牌type熟食 + 小象的子品牌type自有品牌）
+    parent = _find_parent_brand(std_name)
+    if parent and BRAND_DATABASE_V6.get(parent, {}).get('type') == '自有品牌':
+        return '自营'
 
     return ''
 

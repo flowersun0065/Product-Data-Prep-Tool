@@ -670,6 +670,10 @@ def _build_result_entry(item, brand_info=None, cat_info=None) -> dict:
         brand_name = brand_info.get('value', '')
     else:
         brand_name = item.get('brand', '')
+        if not brand_name or str(brand_name).strip() in ('', 'nan'):
+            ext = BrandConsistencyChecker._extract_from_name(item.get('name', '')) or ''
+            if ext:
+                brand_name = ext
 
     if cat_info:
         category_ai = cat_info.get('path', '')
@@ -853,8 +857,12 @@ def finalize_review_async(session_id: str):
             }
             entry = _build_result_entry(item)
             if still_pending:
-                entry['brand_status'] = 'pending'
-                entry['category_status'] = 'pending'
+                entry['brand_status'] = 'local'
+                entry['category_status'] = 'local'
+                entry['brand_confidence'] = 0.8 if entry.get('brand_ai') and entry['brand_ai'] != brand else 0.5
+                entry['category_confidence'] = 0.6
+                entry['needs_review'] = True
+                entry['review_status'] = '待复核'
                 pending_n += 1
             else:
                 entry['brand_confidence'] = 1.0
@@ -871,6 +879,9 @@ def finalize_review_async(session_id: str):
         # 直接复核路径：review_file 包含全部条目（已确认 + 待复核），
         # 让用户在复核页看到所有商品，用 review_status 区分状态。
         if combined:
+            # 清理同 session 旧 review 文件，避免 uuid 累积
+            for old_f in RESULT_FOLDER.glob(f"{session_id}_review_*.xlsx"):
+                old_f.unlink(missing_ok=True)
             all_ai_df = pd.DataFrame(combined)
             all_ai_df['code'] = all_ai_df['code'].astype(str)
             if code_col and code_col in original_df.columns:

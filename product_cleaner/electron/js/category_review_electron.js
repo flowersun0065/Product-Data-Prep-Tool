@@ -539,6 +539,39 @@
           setBtn.onclick = (function(c){ return function(e){ e.stopPropagation(); if(window._emSetCategoryForItem) window._emSetCategoryForItem(c); }; })(code);
           actRow.appendChild(setBtn);
 
+          // 设为当前路径（当前分组路径）
+          if (path && (!item.suggested_path || item.suggested_path[0] !== path)) {
+            var curBtn = document.createElement('button');
+            curBtn.className = 'btn-agent primary';
+            curBtn.textContent = '设为当前路径';
+            curBtn.onclick = (function(c, p) {
+              return function(e) {
+                e.stopPropagation();
+                window.categoryRules[c] = { action: 'confirm', replacement: p };
+                if (window.saveAllCategoryRules) window.saveAllCategoryRules();
+                setTimeout(function() { renderPage(currentPage); }, 200);
+              };
+            })(code, path);
+            actRow.appendChild(curBtn);
+          }
+
+          // 按建议归集
+          var sugPath = item.suggested_path && item.suggested_path[0];
+          if (sugPath) {
+            var sugBtn = document.createElement('button');
+            sugBtn.className = 'btn-agent secondary';
+            sugBtn.textContent = '按建议归集';
+            sugBtn.onclick = (function(c, sp) {
+              return function(e) {
+                e.stopPropagation();
+                window.categoryRules[c] = { action: 'confirm', replacement: sp };
+                if (window.saveAllCategoryRules) window.saveAllCategoryRules();
+                setTimeout(function() { renderPage(currentPage); }, 200);
+              };
+            })(code, sugPath);
+            actRow.appendChild(sugBtn);
+          }
+
           var skipBtn = document.createElement('button');
           skipBtn.className = 'btn-agent secondary';
           skipBtn.textContent = '跳过';

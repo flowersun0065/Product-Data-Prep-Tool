@@ -229,7 +229,7 @@ class BrandConsistencyChecker:
 
         # 第 1 层：精准匹配（使用哈希索引加速）
         # 先尝试用常见分隔符切分，快速匹配
-        for sep in [' ', '/', '／', '(', '（', '【', '[', '】', ']']:
+        for sep in [' ', '/', '／', '.', '(', '（', '【', '[', '】', ']']:
             if sep in name_clean:
                 parts = name_clean.split(sep)
                 for part in parts:
@@ -267,6 +267,7 @@ class BrandConsistencyChecker:
             r'^([A-Za-z\u4e00-\u9fff]{2,8})\s+',
             r'^([A-Za-z\u4e00-\u9fff]{2,8})[/／]',
             r'^([A-Za-z\u4e00-\u9fff]{2,8})[\(\（]',
+            r'^([A-Za-z][A-Za-z0-9.]{3,30})(?=[\u4e00-\u9fff])',
         ]
 
         for pattern in patterns:
