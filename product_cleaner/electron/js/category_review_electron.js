@@ -223,13 +223,113 @@
   };
 
   window.filterCategoryReview = function(text) {
+    var lower = (text || '').toLowerCase().trim();
+    if (!lower) { renderCategoryReview(); return; }
+
+    // 从全量分组数据中搜索，不受分页限制
+    var matched = [];
+    Object.keys(_catReviewGroups).forEach(function(key) {
+      var group = _catReviewGroups[key];
+      // 匹配分组路径或商品名称
+      if (group.path.toLowerCase().indexOf(lower) !== -1) {
+        matched.push(group);
+        return;
+      }
+      for (var i = 0; i < group.items.length; i++) {
+        var item = group.items[i];
+        if ((item.name || '').toLowerCase().indexOf(lower) !== -1 ||
+            (item.code || '').toLowerCase().indexOf(lower) !== -1) {
+          matched.push(group);
+          return;
+        }
+        // 也搜 all_paths
+        var paths = item.all_paths || [];
+        for (var j = 0; j < paths.length; j++) {
+          if (paths[j].toLowerCase().indexOf(lower) !== -1) {
+            matched.push(group);
+            return;
+          }
+        }
+      }
+    });
+
+    // 重新渲染匹配结果（不分页）
     var container = document.getElementById('emCategoryGroups');
     if (!container) return;
-    var lower = (text || '').toLowerCase();
-    var cards = container.querySelectorAll('.cat-group-card');
-    cards.forEach(function(card) {
-      if (!lower) { card.style.display = ''; return; }
-      card.style.display = card.textContent.toLowerCase().indexOf(lower) !== -1 ? '' : 'none';
+    container.textContent = '';
+
+    if (!matched.length) {
+      var emptyMsg = document.createElement('div');
+      emptyMsg.style.cssText = 'font-size:11px;color:var(--text-muted);padding:32px;text-align:center;';
+      emptyMsg.textContent = '无匹配分组';
+      container.appendChild(emptyMsg);
+      return;
+    }
+
+    var sc = _catReviewTab === 'marketing' ? 'var(--red)' : 'var(--green)';
+    matched.sort(function(a, b) { return b.count - a.count; });
+    matched.forEach(function(g) {
+      var path = g.path, count = g.count, items = g.items || [];
+      var proc = items.filter(function(i) { return (window.categoryRules || {})[String(i.code).trim()]; }).length;
+      var examples = items.slice(0, 3).map(function(i) { return esc(i.name || i.code); }).join(', ');
+
+      var card = document.createElement('div');
+      card.className = 'cat-group-card';
+      card.style.cssText = 'border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px;cursor:pointer;background:var(--panel);';
+      card.addEventListener('mouseover', function() { this.style.borderColor = 'var(--accent)'; });
+      card.addEventListener('mouseout', function() { this.style.borderColor = 'var(--border)'; });
+
+      var flexRow = document.createElement('div');
+      flexRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;';
+
+      var leftCol = document.createElement('div');
+      leftCol.style.cssText = 'flex:1;min-width:0;';
+      var titleDiv = document.createElement('div');
+      titleDiv.style.cssText = 'font-size:13px;font-weight:500;color:var(--text-main);';
+      titleDiv.textContent = _catReviewTab === 'missing' ? '分类缺失商品' : path;
+      leftCol.appendChild(titleDiv);
+
+      var infoDiv = document.createElement('div');
+      infoDiv.style.cssText = 'font-size:11px;color:var(--text-sub);margin-top:2px;';
+      if (_catReviewTab === 'missing') {
+        infoDiv.textContent = '无分类路径，需手动设置';
+      } else if (_catReviewTab === 'marketing') {
+        infoDiv.textContent = '纯营销路径，建议待 AI 分析';
+      } else {
+        var infoBold = document.createElement('b');
+        infoBold.style.color = sc;
+        infoBold.textContent = path;
+        infoDiv.textContent = '建议路径: ';
+        infoDiv.appendChild(infoBold);
+      }
+      leftCol.appendChild(infoDiv);
+
+      var exampleDiv = document.createElement('div');
+      exampleDiv.style.cssText = 'font-size:10px;color:var(--text-muted);margin-top:2px;';
+      exampleDiv.textContent = '示例: ' + examples;
+      leftCol.appendChild(exampleDiv);
+      flexRow.appendChild(leftCol);
+
+      var rightCol = document.createElement('div');
+      rightCol.style.cssText = 'text-align:right;flex-shrink:0;margin-left:12px;';
+      var countDiv = document.createElement('div');
+      countDiv.style.cssText = 'font-size:12px;font-weight:600;color:var(--text-main);';
+      countDiv.textContent = count;
+      rightCol.appendChild(countDiv);
+      var procDiv = document.createElement('div');
+      procDiv.style.cssText = 'font-size:10px;color:' + (proc === count && count > 0 ? 'var(--green)' : 'var(--text-muted)') + ';';
+      procDiv.textContent = proc + ' 已处理';
+      rightCol.appendChild(procDiv);
+      flexRow.appendChild(rightCol);
+      card.appendChild(flexRow);
+      container.appendChild(card);
+
+      // Click to open product list
+      var key = _catReviewTab + '|' + g.path;
+      card.addEventListener('click', function() {
+        var group = _catReviewGroups[key.split('|').slice(1).join('|')];
+        if (group && window._emOpenCategoryProductList) window._emOpenCategoryProductList(g.path, {items: group.items});
+      });
     });
   };
 

@@ -148,8 +148,13 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: '', session_id: localStorage.getItem('last_session_id') || '' })
-    }).then(function(r) { return r.json(); })
-    .then(function(d) { _conversationId = d.conversation_id; });
+    }).then(function(r) {
+      if (!r.ok) throw new Error('创建对话失败: HTTP ' + r.status);
+      return r.json();
+    }).then(function(d) {
+      if (!d.conversation_id) throw new Error('创建对话失败: 缺少 ID');
+      _conversationId = d.conversation_id;
+    });
   }
 
   /* ── Preview panel ── */
@@ -199,6 +204,9 @@
     _ensureConversation().then(function() {
       if (agentInput) agentInput.value = text;
       sendMessage();
+    }).catch(function(e) {
+      console.error(e);
+      appendMessage(renderAssistantMessage('抱歉，连接失败: ' + e.message));
     });
   };
 
