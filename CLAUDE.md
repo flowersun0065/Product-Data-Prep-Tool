@@ -37,11 +37,29 @@ product_cleaner/
     path_cleaner.py    # Category path cleaning algorithm (marketing removal, hierarchy merging)
     classified_paths.py # Persistence for user-labeled marketing/standard path flags
     marketing_keywords.py # Keywords used to detect marketing-oriented categories
+    embedding_matcher.py # Optional embedding-based fuzzy matching helper
+  agent/               # Conversational AI agent (see Agent Module below)
+    agent_loop.py      # Tool-calling loop: LLM 看→想→动, injects workflow/UI context
+    tool_registry.py   # Tool registration + dispatch
+    conversation_store.py # SQLite-backed conversation persistence
+    routes_agent.py    # Agent API routes (register_agent_routes), registered from app.py
+    tools/             # read_*/ai_*/execute_* tools the agent can call
+  brands/
+    database.py        # Brand database V6 (~2000 lines): BRAND_DATABASE_V6 dict + dynamic persistence
+    patterns.py        # Slash brand pattern matching (e.g. "Lay's/乐事")
+  categories/
+    path_cleaner.py    # Category path cleaning algorithm (marketing removal, hierarchy merging)
+    classified_paths.py # Persistence for user-labeled marketing/standard path flags
+    marketing_keywords.py # Keywords used to detect marketing-oriented categories
   templates/
-    html_templates.py  # All HTML/CSS/JS inline (main page + review page)
-  static/js/           # Frontend JS: upload, diagnosis, brand_editor, ai_process, export, review
+    html_templates.py  # All HTML/CSS/JS inline (web main page + review page)
+  static/js/           # Web frontend JS: common, upload, diagnosis, brand_editor, ai_process,
+                       #   export, review, detail-panel, sidebar, electron_init, brand-library, category-tree
+  electron/            # Electron desktop app: index.html (primary UI) + js/ (electron-specific overrides) + css/
   corrections/         # Per-group code-level correction records
   cache/               # Group-scoped caches + groups.json
+
+src/                   # TypeScript source (Vite → static/dist/bundle.js); workflow engine + capability map
 ```
 
 ## Architecture
@@ -61,7 +79,8 @@ product_cleaner/
 - `StandardizationEngine.apply_rules()` mutates DataFrames in place using brand/category rules dicts
 - `CacheManager` uses atomic write (`write tmp → os.replace`) for thread safety. All methods accept `group_id` as first parameter for group-level isolation
 - `diagnose_async()` and `process_file_async()` run in background threads with session-level locks
-- `_build_result_entry()` is the single helper for constructing AI result entries (used by AI/local/skipped branches)
+- **Review is decoupled from AI**: `finalize_review_async()` (triggered by `POST /api/finalize`, frontend `finalizeWithoutAI()`) generates review data + tags for confirmed items WITHOUT calling AI. `process_file_async()` = optional AI-fill of `need_ai_items` → `_write_result_files()`. Both paths share `_write_result_files()` (result_df + review_file writer). AI is only needed for items still requiring it, not as a gate to reach review.
+- `_build_result_entry()` is the single helper for constructing AI result entries (used by AI/local/skipped branches); calls `compute_all_tags()`
 - `_get_group_id(session_id)` extracts group_id from session for passing to cache/database functions
 - `_serialize_session()` only persists file-level data; brand-library data (new_brands, confirmed_brands) lives globally
 - `infer_brand_metadata()` uses heuristic country/type detection for new brand candidates
@@ -81,3 +100,10 @@ product_cleaner/
 - Brand processing: library lookup first → AI fallback → confidence scoring
 - Category processing: AI analysis first → fallback to local `CategoryDetector.suggest_category()` rule engine
 - All brand/classifier logic, prompts, and heuristics are embedded in Python source code
+
+## Agent Module (`product_cleaner/agent/`)
+
+- Conversational AI assistant that operates the tool via tool-calling. `register_agent_routes(app)` (called from `app.py`) registers `/api/agent/*` routes and all tools.
+- `agent_loop.call_tool_loop()` runs the 看→想→动 loop: LLM 决定调工具或直接回复，结果喂回再决定，最多 `MAX_ITERATIONS` 轮。
+- Tools live in `agent/tools/`: `read_*` (诊断结果/品牌库/词库/国家/会话), `ai_*` (AI 审核新品牌/总结), `execute_*` (改品牌库/跑 Python)。Registered via `ToolRegistry`.
+- Receives `ui_context` from the frontend describing the user's current selection/panel. (Workflow capability-map context — current step + selected card + available operations — is the target of the in-progress TS workflow engine under `src/workflow/`.)

@@ -52,7 +52,8 @@ class CacheManager:
     def _load(self, path: Path) -> Dict:
         if path.exists():
             try:
-                return json.load(open(path, 'r', encoding='utf-8'))
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
             except Exception:
                 return {}
         return {}
@@ -60,7 +61,8 @@ class CacheManager:
     def _save(self, path: Path, data: Dict):
         try:
             tmp = path.with_suffix('.tmp')
-            json.dump(data, open(tmp, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+            with open(tmp, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
             os.replace(str(tmp), str(path))
         except Exception as e:
             print(f"Cache save error: {e}")

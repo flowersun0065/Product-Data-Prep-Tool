@@ -253,6 +253,7 @@
           </div>
           <div class="cp-footer" style="display:flex;gap:8px;">
             <button class="btn-agent primary" onclick="if(typeof startAIProcessing==='function')startAIProcessing();">开始AI处理</button>
+            <button class="btn-agent" onclick="if(typeof finalizeWithoutAI==='function')finalizeWithoutAI();" title="所有需确认项已确认完，直接生成复核数据，不调用 AI">直接进入复核(无AI)</button>
           </div>
         </div>
       </div>

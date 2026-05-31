@@ -723,6 +723,170 @@ def _build_result_entry(item, brand_info=None, cat_info=None) -> dict:
     return entry
 
 
+def _write_result_files(session_id: str, original_df, combined: list, code_col: str):
+    """根据 combined 结果条目写出 result_file 与 review_file（纯文件生成，无 AI 依赖）。
+
+    被 process_file_async（AI 路径）与 finalize_review_async（无 AI 路径）共用。
+    """
+    if not combined:
+        return
+    session = sessions[session_id]
+    ai_df = pd.DataFrame(combined)
+    # left join 到原始 df：保留全部原始列 + AI 新增列
+    if code_col and code_col in original_df.columns:
+        original_df[code_col] = original_df[code_col].astype(str)
+        ai_df['code'] = ai_df['code'].astype(str)
+        result_df = original_df.merge(ai_df, left_on=code_col, right_on='code', how='left')
+    else:
+        result_df = ai_df
+    result_file = RESULT_FOLDER / f"{session_id}_result.xlsx"
+    result_df.to_excel(str(result_file), index=False)
+    session['result_file'] = str(result_file)
+
+    # 生成 review_file：原始 df 先去重再 merge ai 结果，避免源数据同 code 多行撑大
+    if code_col and code_col in original_df.columns and 'needs_review' in ai_df.columns:
+        review_df = (
+            original_df.drop_duplicates(subset=code_col, keep='first')
+            .merge(ai_df[ai_df['needs_review'] == True],
+                   left_on=code_col, right_on='code', how='inner')
+        )
+    elif 'needs_review' in ai_df.columns:
+        review_df = ai_df[ai_df['needs_review'] == True]
+    else:
+        review_df = pd.DataFrame()
+    if not review_df.empty:
+        review_file = RESULT_FOLDER / f"{session_id}_review_{uuid.uuid4().hex[:6]}.xlsx"
+        review_df.to_excel(str(review_file), index=False)
+        session['review_file'] = str(review_file)
+
+
+def finalize_review_async(session_id: str):
+    """无 AI 直接生成复核数据。
+
+    用于"所有需确认项都确认完，直接进入复核"——不触发 AI。
+    已确认项标记为「已确认」，仍未确认项标记为「待复核」以便人工处理。
+    标签计算（compute_all_tags）通过 _build_result_entry 正常完成。
+    """
+    session = sessions[session_id]
+    session['status'] = 'processing'
+    session['ai_phase'] = 'finalizing'
+    session['logs'] = session.get('logs', [])
+    session['ai_logs'] = []
+    session['review_pending'] = []
+    session['start_time'] = datetime.now()
+    try:
+        session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] 直接进入复核（无AI），正在生成复核数据...")
+        df = pd.read_excel(session['file_path'])
+        df = df.replace({np.nan: None})
+
+        rules = cache_manager.get_rules(_get_group_id(session_id), session_id)
+        df = StandardizationEngine.apply_rules(df, session['col_mapping'], rules)
+        original_df = df.copy()
+
+        cm = session['col_mapping']
+        name_col = cm.get('org_spu_name')
+        brand_col = cm.get('brand_name')
+        spec_col = cm.get('spu_spec')
+        code_col = cm.get('org_spu_code')
+        cate1_col = cm.get('cate_level1_name')
+        cate2_col = cm.get('cate_level2_name')
+        cate3_col = cm.get('cate_level3_name')
+        org_prom_price_col = _find_optional_column(df, 'prom_price', '促销价')
+        org_recommend_tag_col = _find_optional_column(df, 'recommend_tag', '推荐标签')
+        org_prom_spu_tag_col = _find_optional_column(df, 'prom_spu_tag', '促销标签')
+
+        brand_rules = session.get('brand_rules', {})
+        cat_rules = rules.get('categories', {})
+        diagnosis_result = session.get('diagnosis_result', {})
+        code_suggested_cat = {}
+        for ac in diagnosis_result.get('all_codes', []):
+            c = ac.get('code', '')
+            sp = (ac.get('suggested_path') or [''])[0]
+            if c and sp:
+                code_suggested_cat[c] = sp
+
+        combined = []
+        seen_codes = set()
+        confirmed_n = 0
+        pending_n = 0
+        for idx, row in df.iterrows():
+            code = str(row.get(code_col, '')).strip() if code_col else f"row_{idx}"
+            if code_col and code in seen_codes:
+                continue
+            seen_codes.add(code)
+            name = str(row.get(name_col, '')).strip() if name_col else ''
+            if not name:
+                continue
+            brand = str(row.get(brand_col, '')).strip() if brand_col and row.get(brand_col) else ''
+            spec = str(row.get(spec_col, '')).strip() if spec_col and row.get(spec_col) else ''
+            cate1 = str(row.get(cate1_col, '')).strip() if cate1_col and row.get(cate1_col) else ''
+            cate2 = str(row.get(cate2_col, '')).strip() if cate2_col and row.get(cate2_col) else ''
+            cate3 = str(row.get(cate3_col, '')).strip() if cate3_col and row.get(cate3_col) else ''
+            category = f"{cate1} > {cate2} > {cate3}" if cate3 else ''
+
+            val = row.get(org_prom_price_col)
+            _org_prom_price = str(val).strip() if val is not None else ''
+            val = row.get(org_recommend_tag_col)
+            _org_recommend_tag = str(val).strip() if val is not None else ''
+            val = row.get(org_prom_spu_tag_col)
+            _org_prom_spu_tag = str(val).strip() if val is not None else ''
+
+            brand_rule = brand_rules.get(code, {})
+            needs_brand_ai = bool(brand_rule.get('skipped')) or (
+                not brand_rule and (not brand or brand == 'nan')
+            )
+            cat_rule = cat_rules.get(code, {})
+            needs_category_ai = cat_rule.get('action') not in ('confirm', 'replace')
+            still_pending = needs_brand_ai or needs_category_ai
+
+            item = {
+                'code': code,
+                'name': name,
+                'brand': brand,
+                'spec': spec,
+                'category': code_suggested_cat.get(code) or category,
+                'category_original': category,
+                '_org_prom_price': _org_prom_price,
+                '_org_recommend_tag': _org_recommend_tag,
+                '_org_prom_spu_tag': _org_prom_spu_tag,
+                '_needs_review': still_pending,
+            }
+            entry = _build_result_entry(item)
+            if still_pending:
+                entry['brand_status'] = 'pending'
+                entry['category_status'] = 'pending'
+                pending_n += 1
+            else:
+                entry['brand_confidence'] = 1.0
+                entry['brand_status'] = 'skipped'
+                entry['category_status'] = 'skipped'
+                entry['category_confidence'] = 1.0
+                confirmed_n += 1
+            combined.append(entry)
+            if entry.get('needs_review'):
+                session['review_pending'].append(entry)
+
+        _write_result_files(session_id, original_df, combined, code_col)
+
+        session['total'] = len(combined)
+        session['status'] = 'completed'
+        session['ai_phase'] = 'completed'
+        session['progress'] = 100
+        session['message'] = f'已生成复核数据：确认 {confirmed_n} 条，待复核 {pending_n} 条（未经 AI）'
+        session['end_time'] = datetime.now()
+        session['logs'].append(
+            f"[{datetime.now().strftime('%H:%M:%S')}] 复核数据就绪：确认 {confirmed_n}，待复核 {pending_n}"
+        )
+        logger.info(f"Session {session_id} finalized without AI. {session['message']}")
+    except Exception as e:
+        logger.error(f"Finalize error: {e}")
+        session['status'] = 'error'
+        session['ai_phase'] = 'error'
+        session['message'] = str(e)
+        session['end_time'] = datetime.now()
+        session['logs'].append(f"[{datetime.now().strftime('%H:%M:%S')}] 错误: {e}")
+
+
 def process_file_async(session_id: str, providers: List[Dict] = None,
                        batch_size: int = 20,
                        ai_provider: str = None,
@@ -1179,34 +1343,7 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
                 entry['brand_status'] = 'skipped'
                 combined.append(entry)
             combined.extend(all_results)
-            if combined:
-                ai_df = pd.DataFrame(combined)
-                # left join 到原始 df：保留全部原始列 + AI 新增列
-                if code_col and code_col in original_df.columns:
-                    original_df[code_col] = original_df[code_col].astype(str)
-                    ai_df['code'] = ai_df['code'].astype(str)
-                    result_df = original_df.merge(ai_df, left_on=code_col, right_on='code', how='left')
-                else:
-                    result_df = ai_df
-                result_file = RESULT_FOLDER / f"{session_id}_result.xlsx"
-                result_df.to_excel(str(result_file), index=False)
-                session['result_file'] = str(result_file)
-
-                # 生成 review_file：原始 df 先去重再 merge ai 结果，避免源数据同 code 多行撑大
-                if code_col and code_col in original_df.columns and 'needs_review' in ai_df.columns:
-                    review_df = (
-                        original_df.drop_duplicates(subset=code_col, keep='first')
-                        .merge(ai_df[ai_df['needs_review'] == True],
-                               left_on=code_col, right_on='code', how='inner')
-                    )
-                elif 'needs_review' in ai_df.columns:
-                    review_df = ai_df[ai_df['needs_review'] == True]
-                else:
-                    review_df = pd.DataFrame()
-                if not review_df.empty:
-                    review_file = RESULT_FOLDER / f"{session_id}_review_{uuid.uuid4().hex[:6]}.xlsx"
-                    review_df.to_excel(str(review_file), index=False)
-                    session['review_file'] = str(review_file)
+            _write_result_files(session_id, original_df, combined, code_col)
 
             time.sleep(0.2)
 
@@ -1235,32 +1372,7 @@ def process_file_async(session_id: str, providers: List[Dict] = None,
             combined.append(entry)
         combined.extend(all_results)
 
-        if combined:
-            ai_df = pd.DataFrame(combined)
-            if code_col and code_col in original_df.columns:
-                original_df[code_col] = original_df[code_col].astype(str)
-                ai_df['code'] = ai_df['code'].astype(str)
-                result_df = original_df.merge(ai_df, left_on=code_col, right_on='code', how='left')
-            else:
-                result_df = ai_df
-            result_file = RESULT_FOLDER / f"{session_id}_result.xlsx"
-            result_df.to_excel(str(result_file), index=False)
-            session['result_file'] = str(result_file)
-
-            if code_col and code_col in original_df.columns and 'needs_review' in ai_df.columns:
-                review_df = (
-                    original_df.drop_duplicates(subset=code_col, keep='first')
-                    .merge(ai_df[ai_df['needs_review'] == True],
-                           left_on=code_col, right_on='code', how='inner')
-                )
-            elif 'needs_review' in ai_df.columns:
-                review_df = ai_df[ai_df['needs_review'] == True]
-            else:
-                review_df = pd.DataFrame()
-            if not review_df.empty:
-                review_file = RESULT_FOLDER / f"{session_id}_review_{uuid.uuid4().hex[:6]}.xlsx"
-                review_df.to_excel(str(review_file), index=False)
-                session['review_file'] = str(review_file)
+        _write_result_files(session_id, original_df, combined, code_col)
 
         # 如果被取消，不要覆盖 cancelled 状态
         if session.get('status') != 'cancelled':
@@ -2970,6 +3082,19 @@ def register_routes(app):
             target=process_file_async,
             args=(session_id, providers, batch_size, ai_provider, api_key, model_id, force_reanalyze, base_url)
         )
+        thread.start()
+
+        return jsonify({'success': True})
+
+    @app.route('/api/finalize', methods=['POST'])
+    def start_finalize():
+        """直接进入复核（无 AI）：所有需确认项确认完后生成复核数据，不触发 AI。"""
+        data = request.json or {}
+        session_id = data.get('session_id')
+        if session_id not in sessions:
+            return jsonify({'error': '会话不存在'}), 404
+
+        thread = threading.Thread(target=finalize_review_async, args=(session_id,))
         thread.start()
 
         return jsonify({'success': True})

@@ -21,6 +21,9 @@ let groupPagination = {
     unbranded: { page: 1, perPage: 10 }
 };
 
+// 分类分区分页状态（diagnosis.js changeCategorySectionPage 使用，避免 ReferenceError）
+if (typeof window.categorySectionPagination === 'undefined') window.categorySectionPagination = {};
+
 // 图片预览
 function previewImage(url) {
     const overlay = document.createElement('div');

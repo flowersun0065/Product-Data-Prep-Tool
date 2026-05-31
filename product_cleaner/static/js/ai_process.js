@@ -401,7 +401,63 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// 直接进入复核（无 AI）：所有需确认项已确认完，跳过 AI 生成复核数据
+async function finalizeWithoutAI() {
+    // 1. 先保存当前的品牌/分类规则
+    if (typeof saveAllCategoryRules === 'function') {
+        await saveAllCategoryRules();
+    }
+
+    // 2. 复用 AI 处理的进度 UI
+    showAIHeaderStatus('⏳ 生成复核数据...', 'bg-yellow-500');
+    const configPanel = document.getElementById('aiConfigPanel');
+    if (configPanel) configPanel.classList.add('hidden');
+    const progressSection = document.getElementById('aiProgressSection');
+    if (progressSection) progressSection.classList.remove('hidden');
+    const bar = document.getElementById('aiProgressBar');
+    if (bar) { bar.style.width = '0%'; bar.classList.remove('bg-red-500'); }
+    const detail = document.getElementById('aiProgressDetail');
+    if (detail) detail.textContent = '正在生成复核数据（无 AI）...';
+    const logC = document.getElementById('aiLogContainer');
+    if (logC) logC.innerHTML = '<div class="text-slate-500 italic">无需 AI，正在整理已确认数据...</div>';
+    const cancelBtn = document.getElementById('aiCancelBtn');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+    const errMsg = document.getElementById('aiErrorMessage');
+    if (errMsg) errMsg.classList.add('hidden');
+    const titleEl = document.getElementById('aiStatusTitle');
+    if (titleEl) titleEl.textContent = '正在生成复核数据（未经 AI）...';
+
+    // 3. POST /api/finalize 启动（不调用 AI）
+    try {
+        const res = await fetch('/api/finalize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            throw new Error(data.error || '启动失败');
+        }
+    } catch (err) {
+        onAIError('生成复核数据失败: ' + err.message);
+        return;
+    }
+
+    // 4. 处理中即可打开复核页
+    const reviewBtn = document.getElementById('aiReviewBtn');
+    if (reviewBtn) reviewBtn.classList.remove('hidden');
+    const completeActions = document.getElementById('aiCompleteActions');
+    if (completeActions) completeActions.classList.remove('hidden');
+
+    // 5. 复用同一套状态轮询（/api/status）
+    aiPollTimer = setInterval(pollAIProgress, 1500);
+    aiLogPollTimer = setInterval(pollAILogs, 1500);
+    pollAIProgress();
+    pollAILogs();
+}
+
 // 暴露到全局
+window.finalizeWithoutAI = finalizeWithoutAI;
 window.startAIProcessing = startAIProcessing;
 window.saveAIConfig = saveAIConfig;
 window.retryAI = retryAI;

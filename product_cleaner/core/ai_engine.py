@@ -628,7 +628,8 @@ class ProductCleanerEngine:
         try:
             cf = Path(__file__).parent.parent / 'categories' / 'classified_paths.json'
             if cf.exists():
-                cdata = json.load(open(cf, 'r', encoding='utf-8'))
+                with open(cf, 'r', encoding='utf-8') as f:
+                    cdata = json.load(f)
                 marketing_set = {p for p, lbl in cdata.items() if lbl == 'marketing'}
         except Exception: pass
 
@@ -752,7 +753,8 @@ class ProductCleanerEngine:
         try:
             cf = Path(__file__).parent.parent / 'categories' / 'classified_paths.json'
             if cf.exists():
-                cdata = json.load(open(cf, 'r', encoding='utf-8'))
+                with open(cf, 'r', encoding='utf-8') as f:
+                    cdata = json.load(f)
                 marketing_set = {p for p, lbl in cdata.items() if lbl == 'marketing'}
         except Exception: pass
 

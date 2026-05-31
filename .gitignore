@@ -53,3 +53,6 @@ dist/
 *.dmg
 *.exe
 *.nsis
+
+# Agent runtime DB
+product_cleaner/cache/*.db

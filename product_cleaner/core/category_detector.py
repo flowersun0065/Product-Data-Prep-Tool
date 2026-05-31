@@ -36,9 +36,10 @@ class CategoryDetector:
         return not any(CategoryDetector._level_has_marketing(l) for l in levels)
 
     @staticmethod
-    def is_marketing_category(path: str) -> bool:
-        """逐级判断路径是否纯营销（所有级都含营销词才判营销）
-        与 _classify_code_paths 的逐级逻辑一致"""
+    def _is_pure_marketing_path(path: str) -> bool:
+        """逐级判断路径是否纯营销（所有级都含营销词才判营销）—— 纯算法，不读持久化标记
+        与 _classify_code_paths 的逐级逻辑一致。
+        注意：对外语义判断请用 is_marketing_category（优先读人工标记）"""
         if not path:
             return False
         levels = [l.strip().lower() for l in path.split(' > ')]
@@ -144,18 +145,15 @@ class CategoryDetector:
                                      cate1_col, cate2_col, cate3_col)
         cleaned_paths = clean_paths(raw_paths)  # {path: [code1, code2, ...]}
 
-        # 额外过滤：读取 classified_paths.json 中标记为 marketing 的路径
+        # 额外过滤：剔除已标记为 marketing 的路径
         # 防止 path_cleaner 模块缓存未刷新导致已标记营销的路径仍被建议
+        # 统一走 load_classified_paths() 访问器（与 _classify_code_paths 一致），避免重复手写文件读取
         try:
-            from pathlib import Path
-            cp_file = Path(__file__).parent.parent / 'categories' / 'classified_paths.json'
-            if cp_file.exists():
-                import json
-                with open(cp_file, 'r', encoding='utf-8') as f:
-                    classified = json.load(f)
-                for path in list(cleaned_paths.keys()):
-                    if classified.get(path) == 'marketing':
-                        del cleaned_paths[path]
+            from ..categories.classified_paths import load_classified_paths
+            classified = load_classified_paths()
+            for path in list(cleaned_paths.keys()):
+                if classified.get(path) == 'marketing':
+                    del cleaned_paths[path]
         except Exception:
             pass
 

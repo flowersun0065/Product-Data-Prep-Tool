@@ -410,6 +410,9 @@ HTML_TEMPLATE = '''
                 <button onclick="startAIProcessing()" class="px-6 py-2 bg-gradient-to-br from-brand-500 to-brand-700 hover:from-brand-400 hover:to-brand-600 rounded-lg text-sm font-medium text-white transition-colors shadow-sm flex items-center gap-2">
                     交给AI处理
                 </button>
+                <button onclick="finalizeWithoutAI()" title="所有需确认项已确认完，直接生成复核数据，不调用 AI" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium text-white transition-colors border border-slate-600">
+                    直接进入复核(无AI)
+                </button>
             </div>
         </div>
 

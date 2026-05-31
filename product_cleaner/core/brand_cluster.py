@@ -183,7 +183,7 @@ class BrandClusterEngine:
                     # ===== 子分支 1b：提取器未找到品牌 =====
                     # 兜底方案：商品名逐字滑动窗口匹配品牌库
                     clean_name = clean_product_name(name)
-                    name_chars = re.sub(r'[^\一-龥]', '', clean_name)
+                    name_chars = re.sub(r'[^一-龥]', '', clean_name)
                     brand_from_name = None
                     max_n = min(15, len(name_chars))
                     for start in range(max_n):
@@ -522,7 +522,6 @@ class BrandClusterEngine:
                     used.add(other)
             groups.append(group)
 
-        return groups
         return groups
 
 
